@@ -39,9 +39,9 @@ TorqueFX is a modular DeFi protocol that enables users to:
 - `TorqueRouter.sol`: Trading pair and price feed management
 - `Torque.sol`: Native ERC20 token with voting and omnichain support
 - `TorqueRewards.sol`: Staking and rewards distribution
-- `TorqueLP.sol`: ERC20 LP token for liquidity providers
 - `TorqueAccount.sol`: User account and leverage management
 - `TorqueFX.sol`: Main leveraged trading contract
+- `currencies/`: Directory containing currency-specific contracts (TorqueUSD, TorqueEUR, TorqueGBP, TorqueJPY, TorqueAUD, TorqueCAD, TorqueCHF, TorqueNZD, TorqueXAU, TorqueXAG)
 
 ## Getting Started
 
@@ -83,8 +83,17 @@ npx hardhat run scripts/deploy.ts --network <network-name>
 | TorqueRouter     | `0x...`          | `0x...`           |
 | Torque           | `0x...`          | `0x...`           |
 | TorqueRewards    | `0x...`          | `0x...`           |
-| TorqueLP         | `0x...`          | `0x...`           |
 | TorqueAccount    | `0x...`          | `0x...`           |
+| TorqueUSD        | `0x...`          | `0x...`           |
+| TorqueEUR        | `0x...`          | `0x...`           |
+| TorqueGBP        | `0x...`          | `0x...`           |
+| TorqueJPY        | `0x...`          | `0x...`           |
+| TorqueAUD        | `0x...`          | `0x...`           |
+| TorqueCAD        | `0x...`          | `0x...`           |
+| TorqueCHF        | `0x...`          | `0x...`           |
+| TorqueNZD        | `0x...`          | `0x...`           |
+| TorqueXAU        | `0x...`          | `0x...`           |
+| TorqueXAG        | `0x...`          | `0x...`           |
 
 ## Usage
 
@@ -134,4 +143,4 @@ npx hardhat test
 
 ## License
 
-This project is licensed under the ISC License.
+This project is licensed under the Business Source License (BUSL). See the LICENSE file for details.
