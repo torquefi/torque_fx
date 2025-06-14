@@ -35,8 +35,6 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 
 ## Contract Addresses
 
-> **Note:** Replace with actual deployed addresses.
-
 | Contract         | Address (Mainnet) | Address (Testnet) |
 |------------------|------------------|-------------------|
 | TorqueFX         | `0x...`          | `0x...`           |
