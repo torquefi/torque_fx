@@ -31,6 +31,7 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `TorqueAccount.sol`: User account and leverage management
 - `TorqueFX.sol`: Main leveraged trading contract
 - `currencies/`: Currency-specific contracts
+- `engines/`: Currency-specific engine
 
 ## Contract Addresses
 
@@ -42,6 +43,14 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueRouter     | `0x...`          | `0x...`           |
 | TorqueRewards    | `0x...`          | `0x...`           |
 | TorqueAccount    | `0x...`          | `0x...`           |
+| TorqueUSDEngine  | `0x...`          | `0x...`           |
+| TorqueEUREngine  | `0x...`          | `0x...`           |
+| TorqueGBPEngine  | `0x...`          | `0x...`           |
+| TorqueJPYEngine  | `0x...`          | `0x...`           |
+| TorqueAUDEngine  | `0x...`          | `0x...`           |
+| TorqueCADEngine  | `0x...`          | `0x...`           |
+| TorqueCHFEngine  | `0x...`          | `0x...`           |
+| TorqueNZDEngine  | `0x...`          | `0x...`           |
 | TorqueUSD        | `0x...`          | `0x...`           |
 | TorqueEUR        | `0x...`          | `0x...`           |
 | TorqueGBP        | `0x...`          | `0x...`           |
@@ -50,8 +59,6 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueCAD        | `0x...`          | `0x...`           |
 | TorqueCHF        | `0x...`          | `0x...`           |
 | TorqueNZD        | `0x...`          | `0x...`           |
-| TorqueXAU        | `0x...`          | `0x...`           |
-| TorqueXAG        | `0x...`          | `0x...`           |
 
 ## Getting Started
 

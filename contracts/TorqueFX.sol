@@ -76,6 +76,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     mapping(address => uint256) public lastTradeTimestamp;
     mapping(address => uint256) public dailyVolume;
     uint256 public lastVolumeReset;
+    mapping(address => bool) public addressCircuitBreaker;
 
     event PositionOpened(address indexed user, bytes32 indexed pair, uint256 collateral, uint256 leverage, bool isLong, uint256 accountId, int256 entryPrice);
     event PositionClosed(address indexed user, bytes32 indexed pair, int256 pnl, uint256 collateralReturned, uint256 feeCharged);
@@ -89,6 +90,12 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     event CircuitBreakerToggled(bool active);
     event MaxPositionSizeUpdated(uint256 size);
     event DEXPoolUpdated(bytes32 indexed pair, address pool);
+    event AddressCircuitBreakerToggled(address indexed target, bool paused);
+
+    modifier whenAddressNotPaused(address target) {
+        require(!addressCircuitBreaker[target], "Address is paused");
+        _;
+    }
 
     constructor(
         address _usdc, 
@@ -198,7 +205,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         bool isLong,
         uint256 accountId,
         int256 expectedPrice
-    ) external nonReentrant {
+    ) external nonReentrant whenAddressNotPaused(msg.sender) {
         require(priceFeeds[pair] != address(0), "Pair not allowed");
         require(dexPools[pair] != address(0), "DEX pool not set");
         require(positions[msg.sender][pair].collateral == 0, "Position exists");
@@ -244,7 +251,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     function closePosition(
         bytes32 pair,
         int256 expectedPrice
-    ) external nonReentrant {
+    ) external nonReentrant whenAddressNotPaused(msg.sender) {
         Position storage pos = positions[msg.sender][pair];
         require(pos.collateral > 0, "No position");
 
@@ -287,7 +294,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     function liquidate(
         address user,
         bytes32 pair
-    ) external nonReentrant {
+    ) external nonReentrant whenAddressNotPaused(user) {
         Position storage pos = positions[user][pair];
         require(pos.collateral > 0, "No position");
 
@@ -402,5 +409,10 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         require(open <= 100 && close <= 100, "Fees too high");
         openFeeBps = open;
         closeFeeBps = close;
+    }
+
+    function toggleAddressCircuitBreaker(address target) external onlyOwner {
+        addressCircuitBreaker[target] = !addressCircuitBreaker[target];
+        emit AddressCircuitBreakerToggled(target, addressCircuitBreaker[target]);
     }
 }
