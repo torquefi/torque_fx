@@ -20,7 +20,6 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - **Leveraged Trading**: Open long/short positions with up to 100x leverage
 - **Account System**: Create multiple accounts with custom leverage and referral tracking
 - **Risk Management**: Circuit breaker, position size limits, and liquidation incentives
-- **Security**: Reentrancy protection, pausable contracts, and upgradable architecture
 - **Rewards**: Stake, earn, and claim rewards via TorqueRewards
 
 ## Architecture

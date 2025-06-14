@@ -61,7 +61,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     uint256 public maxPositionSize;
     uint256 public constant LIQUIDATION_INCENTIVE = 1000;
     bool public circuitBreaker;
-    bool public paused;
     uint256 public lastPriceUpdate;
     uint256 public constant POSITION_COOLDOWN = 5 minutes;
     uint256 public constant MAX_DAILY_VOLUME = 1000000e6;
@@ -88,14 +87,8 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     event PriceFeedUpdated(bytes32 indexed pair, address feed);
     event LiquidationThresholdsUpdated(uint256 partial, uint256 full);
     event CircuitBreakerToggled(bool active);
-    event PauseToggled(bool paused);
     event MaxPositionSizeUpdated(uint256 size);
     event DEXPoolUpdated(bytes32 indexed pair, address pool);
-
-    modifier whenNotPaused() {
-        require(!paused, "Contract is paused");
-        _;
-    }
 
     constructor(
         address _usdc, 
@@ -122,7 +115,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         bool isLong,
         uint256 accountId,
         OrderType orderType
-    ) external nonReentrant whenNotPaused {
+    ) external nonReentrant {
         require(priceFeeds[pair] != address(0), "Pair not allowed");
         require(orderCount[msg.sender] < MAX_PENDING_ORDERS, "Too many pending orders");
         
@@ -165,7 +158,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 newCollateral,
         uint256 stopLossPrice,
         uint256 takeProfitPrice
-    ) external nonReentrant whenNotPaused {
+    ) external nonReentrant {
         Position storage pos = positions[msg.sender][pair];
         require(pos.collateral > 0, "No position");
 
@@ -205,7 +198,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         bool isLong,
         uint256 accountId,
         int256 expectedPrice
-    ) external nonReentrant whenNotPaused {
+    ) external nonReentrant {
         require(priceFeeds[pair] != address(0), "Pair not allowed");
         require(dexPools[pair] != address(0), "DEX pool not set");
         require(positions[msg.sender][pair].collateral == 0, "Position exists");
@@ -251,7 +244,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     function closePosition(
         bytes32 pair,
         int256 expectedPrice
-    ) external nonReentrant whenNotPaused {
+    ) external nonReentrant {
         Position storage pos = positions[msg.sender][pair];
         require(pos.collateral > 0, "No position");
 
@@ -294,7 +287,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     function liquidate(
         address user,
         bytes32 pair
-    ) external nonReentrant whenNotPaused {
+    ) external nonReentrant {
         Position storage pos = positions[user][pair];
         require(pos.collateral > 0, "No position");
 
@@ -393,11 +386,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     function toggleCircuitBreaker() external onlyOwner {
         circuitBreaker = !circuitBreaker;
         emit CircuitBreakerToggled(circuitBreaker);
-    }
-
-    function togglePause() external onlyOwner {
-        paused = !paused;
-        emit PauseToggled(paused);
     }
 
     function setMaxPositionSize(uint256 size) external onlyOwner {
