@@ -31,7 +31,7 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `TorqueAccount.sol`: User account and leverage management
 - `TorqueFX.sol`: Main leveraged trading contract
 - `currencies/`: Currency-specific contracts
-- `engines/`: Currency-specific engine
+- `engines/`: Currency-specific engines
 
 ## Contract Addresses
 
