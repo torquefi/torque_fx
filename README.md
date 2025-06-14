@@ -7,7 +7,7 @@
 
 ## Overview
 
-TorqueFX is a high-performance decentralized exchange (DEX) enabling foreign exchange and commodities trading across EVM networks. This repository contains the core contracts that power the protocol, including leveraged trading, AMM pools, and a comprehensive rewards system.
+Torque is a high-performance decentralized exchange (DEX) enabling foreign exchange and commodities trading across EVM networks. This repository contains the core contracts that power the protocol, including leveraged trading, AMM pools, and a comprehensive rewards system.
 
 - **Website**: [torque.fi](https://torque.fi)
 - **Documentation**: [docs.torque.fi](https://docs.torque.fi)
@@ -16,12 +16,12 @@ TorqueFX is a high-performance decentralized exchange (DEX) enabling foreign exc
 
 ## Features
 
+- **fxAMM DEX**: Swap tokens and provide liquidity via TorqueDEX pools
 - **Leveraged Trading**: Open long/short positions with up to 100x leverage
-- **AMM DEX**: Swap tokens and provide liquidity via TorqueDEX pools
 - **Account System**: Create multiple accounts with custom leverage and referral tracking
-- **Rewards**: Stake, earn, and claim rewards via TorqueRewards
 - **Risk Management**: Circuit breaker, position size limits, and liquidation incentives
 - **Security**: Reentrancy protection, pausable contracts, and upgradable architecture
+- **Rewards**: Stake, earn, and claim rewards via TorqueRewards
 
 ## Architecture
 
@@ -31,7 +31,7 @@ TorqueFX is a high-performance decentralized exchange (DEX) enabling foreign exc
 - `TorqueRewards.sol`: Staking and rewards distribution
 - `TorqueAccount.sol`: User account and leverage management
 - `TorqueFX.sol`: Main leveraged trading contract
-- `currencies/`: Directory containing currency-specific contracts (TorqueUSD, TorqueEUR, TorqueGBP, TorqueJPY, TorqueAUD, TorqueCAD, TorqueCHF, TorqueNZD, TorqueXAU, TorqueXAG)
+- `currencies/`: Currency-specific contracts
 
 ## Contract Addresses
 
