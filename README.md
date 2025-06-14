@@ -38,6 +38,16 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | Contract         | Address (Mainnet) | Address (Testnet) |
 |------------------|------------------|-------------------|
 | Torque           | `0x...`          | `0x...`           |
+| TorqueUSD        | `0x...`          | `0x...`           |
+| TorqueEUR        | `0x...`          | `0x...`           |
+| TorqueGBP        | `0x...`          | `0x...`           |
+| TorqueJPY        | `0x...`          | `0x...`           |
+| TorqueAUD        | `0x...`          | `0x...`           |
+| TorqueCAD        | `0x...`          | `0x...`           |
+| TorqueCHF        | `0x...`          | `0x...`           |
+| TorqueNZD        | `0x...`          | `0x...`           |
+| TorqueXAU        | `0x...`          | `0x...`           |
+| TorqueXAG        | `0x...`          | `0x...`           |
 | TorqueFX         | `0x...`          | `0x...`           |
 | TorqueDEX        | `0x...`          | `0x...`           |
 | TorqueRouter     | `0x...`          | `0x...`           |
@@ -53,16 +63,6 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueNZDEngine  | `0x...`          | `0x...`           |
 | TorqueXAUEngine  | `0x...`          | `0x...`           |
 | TorqueXAGEngine  | `0x...`          | `0x...`           |
-| TorqueUSD        | `0x...`          | `0x...`           |
-| TorqueEUR        | `0x...`          | `0x...`           |
-| TorqueGBP        | `0x...`          | `0x...`           |
-| TorqueJPY        | `0x...`          | `0x...`           |
-| TorqueAUD        | `0x...`          | `0x...`           |
-| TorqueCAD        | `0x...`          | `0x...`           |
-| TorqueCHF        | `0x...`          | `0x...`           |
-| TorqueNZD        | `0x...`          | `0x...`           |
-| TorqueXAU        | `0x...`          | `0x...`           |
-| TorqueXAG        | `0x...`          | `0x...`           |
 | Treasury         | `0x...`          | `0x...`           |
 
 ## Getting Started
