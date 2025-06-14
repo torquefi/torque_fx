@@ -7,7 +7,7 @@
 
 ## Overview
 
-Torque is a high-performance decentralized exchange (DEX) enabling foreign exchange and commodities trading across EVM networks. This repository contains the core contracts that power the protocol, including leveraged trading, AMM pools, and a comprehensive rewards system.
+Torque is a high-performance decentralized exchange (DEX) enabling foreign exchange and commodities trading across EVM-compatible networks. This repository contains the core contracts that power the protocol, including leveraged trading, AMM pools, and a comprehensive rewards system.
 
 - **Website**: [torque.fi](https://torque.fi)
 - **Documentation**: [docs.torque.fi](https://docs.torque.fi)
