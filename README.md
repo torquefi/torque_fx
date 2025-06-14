@@ -1,20 +1,9 @@
-# TorqueFX
-
-TorqueFX is a decentralized exchange (DEX) and trading platform built on Ethereum and other leading EVM chains, featuring leveraged trading, AMM pools, and a comprehensive rewards system.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Contract Addresses](#contract-addresses)
-- [Usage](#usage)
-- [Testing](#testing)
-- [Security](#security)
-- [Audits](#audits)
-- [Contributing](#contributing)
-- [License](#license)
+<p align="center">
+  <img src="https://cdn.prod.website-files.com/6556f6be06fc2abb8a8da998/665ce0e7788b3d8fe85d1fed_torque-square%20copy%202.png" alt="Torque Logo" width="13.4%">
+</p>
+<p align="center">
+  <i align="center">Smart contracts for Torque Protocol</i>
+</p>
 
 ## Overview
 
@@ -42,6 +31,29 @@ TorqueFX is a modular DeFi protocol that enables users to:
 - `TorqueAccount.sol`: User account and leverage management
 - `TorqueFX.sol`: Main leveraged trading contract
 - `currencies/`: Directory containing currency-specific contracts (TorqueUSD, TorqueEUR, TorqueGBP, TorqueJPY, TorqueAUD, TorqueCAD, TorqueCHF, TorqueNZD, TorqueXAU, TorqueXAG)
+
+## Contract Addresses
+
+> **Note:** Replace with actual deployed addresses.
+
+| Contract         | Address (Mainnet) | Address (Testnet) |
+|------------------|------------------|-------------------|
+| TorqueFX         | `0x...`          | `0x...`           |
+| TorqueDEX        | `0x...`          | `0x...`           |
+| TorqueRouter     | `0x...`          | `0x...`           |
+| Torque           | `0x...`          | `0x...`           |
+| TorqueRewards    | `0x...`          | `0x...`           |
+| TorqueAccount    | `0x...`          | `0x...`           |
+| TorqueUSD        | `0x...`          | `0x...`           |
+| TorqueEUR        | `0x...`          | `0x...`           |
+| TorqueGBP        | `0x...`          | `0x...`           |
+| TorqueJPY        | `0x...`          | `0x...`           |
+| TorqueAUD        | `0x...`          | `0x...`           |
+| TorqueCAD        | `0x...`          | `0x...`           |
+| TorqueCHF        | `0x...`          | `0x...`           |
+| TorqueNZD        | `0x...`          | `0x...`           |
+| TorqueXAU        | `0x...`          | `0x...`           |
+| TorqueXAG        | `0x...`          | `0x...`           |
 
 ## Getting Started
 
@@ -72,48 +84,6 @@ npx hardhat test
 npx hardhat run scripts/deploy.ts --network <network-name>
 ```
 
-## Contract Addresses
-
-> **Note:** Replace with actual deployed addresses.
-
-| Contract         | Address (Mainnet) | Address (Testnet) |
-|------------------|------------------|-------------------|
-| TorqueFX         | `0x...`          | `0x...`           |
-| TorqueDEX        | `0x...`          | `0x...`           |
-| TorqueRouter     | `0x...`          | `0x...`           |
-| Torque           | `0x...`          | `0x...`           |
-| TorqueRewards    | `0x...`          | `0x...`           |
-| TorqueAccount    | `0x...`          | `0x...`           |
-| TorqueUSD        | `0x...`          | `0x...`           |
-| TorqueEUR        | `0x...`          | `0x...`           |
-| TorqueGBP        | `0x...`          | `0x...`           |
-| TorqueJPY        | `0x...`          | `0x...`           |
-| TorqueAUD        | `0x...`          | `0x...`           |
-| TorqueCAD        | `0x...`          | `0x...`           |
-| TorqueCHF        | `0x...`          | `0x...`           |
-| TorqueNZD        | `0x...`          | `0x...`           |
-| TorqueXAU        | `0x...`          | `0x...`           |
-| TorqueXAG        | `0x...`          | `0x...`           |
-
-## Usage
-
-### Trading
-
-- Connect your wallet (e.g., MetaMask)
-- Create a Torque Account and set leverage
-- Deposit USDC and open a leveraged position via the TorqueFX contract
-- Monitor, modify, or close your position at any time
-
-### Liquidity Provision
-
-- Add liquidity to TorqueDEX pools to earn LP tokens and trading fees
-- Stake LP tokens in TorqueRewards to earn additional rewards
-
-### Staking & Rewards
-
-- Stake Torque or LP tokens in the rewards contract
-- Claim rewards periodically
-
 ## Testing
 
 Run the full test suite:
@@ -121,17 +91,6 @@ Run the full test suite:
 ```bash
 npx hardhat test
 ```
-
-## Security
-
-- All contracts use OpenZeppelin libraries for security
-- Circuit breaker and pausable mechanisms are implemented
-- **Audits:** Security audits are recommended before mainnet deployment
-- **Bug Bounty:** [Add details if available]
-
-## Audits
-
-> _Please use at your own risk._
 
 ## Contributing
 
