@@ -7,11 +7,12 @@
 
 ## Overview
 
-TorqueFX is a modular DeFi protocol that enables users to:
-- Trade with up to 100x leverage
-- Provide and manage liquidity in AMM pools
-- Earn rewards for trading and liquidity provision
-- Manage accounts with custom leverage and referral systems
+TorqueFX is a high-performance decentralized exchange (DEX) enabling foreign exchange and commodities trading across EVM networks. This repository contains the core contracts that power the protocol, including leveraged trading, AMM pools, and a comprehensive rewards system.
+
+- **Website**: [torque.fi](https://torque.fi)
+- **Documentation**: [docs.torque.fi](https://docs.torque.fi)
+- **X (Twitter)**: [x.com/torquefi](https://x.com/torquefi)
+- **Telegram**: [t.me/torquefi](https://t.me/torquefi)
 
 ## Features
 
