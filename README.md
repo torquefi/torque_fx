@@ -1,6 +1,6 @@
 # TorqueFX
 
-TorqueFX is a decentralized exchange (DEX) and trading platform built on Ethereum, featuring leveraged trading, AMM pools, and a comprehensive rewards system.
+TorqueFX is a decentralized exchange (DEX) and trading platform built on Ethereum and other leading EVM chains, featuring leveraged trading, AMM pools, and a comprehensive rewards system.
 
 ## Table of Contents
 
