@@ -37,10 +37,10 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 
 | Contract         | Address (Mainnet) | Address (Testnet) |
 |------------------|------------------|-------------------|
+| Torque           | `0x...`          | `0x...`           |
 | TorqueFX         | `0x...`          | `0x...`           |
 | TorqueDEX        | `0x...`          | `0x...`           |
 | TorqueRouter     | `0x...`          | `0x...`           |
-| Torque           | `0x...`          | `0x...`           |
 | TorqueRewards    | `0x...`          | `0x...`           |
 | TorqueAccount    | `0x...`          | `0x...`           |
 | TorqueUSD        | `0x...`          | `0x...`           |
