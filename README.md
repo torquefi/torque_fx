@@ -51,6 +51,8 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueCADEngine  | `0x...`          | `0x...`           |
 | TorqueCHFEngine  | `0x...`          | `0x...`           |
 | TorqueNZDEngine  | `0x...`          | `0x...`           |
+| TorqueXAUEngine  | `0x...`          | `0x...`           |
+| TorqueXAGEngine  | `0x...`          | `0x...`           |
 | TorqueUSD        | `0x...`          | `0x...`           |
 | TorqueEUR        | `0x...`          | `0x...`           |
 | TorqueGBP        | `0x...`          | `0x...`           |
@@ -59,6 +61,8 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueCAD        | `0x...`          | `0x...`           |
 | TorqueCHF        | `0x...`          | `0x...`           |
 | TorqueNZD        | `0x...`          | `0x...`           |
+| TorqueXAU        | `0x...`          | `0x...`           |
+| TorqueXAG        | `0x...`          | `0x...`           |
 | Treasury         | `0x...`          | `0x...`           |
 
 ## Getting Started
