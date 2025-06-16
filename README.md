@@ -28,8 +28,16 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `TorqueRouter.sol`: Trading pair and price feed management
 - `Torque.sol`: Native ERC20 token with voting and omnichain support
 - `TorqueRewards.sol`: Staking and rewards distribution
-- `TorqueAccount.sol`: User account and leverage management
 - `TorqueFX.sol`: Main leveraged trading contract
+- `4337/`: ERC-4337 account abstraction contracts
+  - `TorqueAccount.sol`: User account and leverage management
+  - `TorqueAccountFactory.sol`: Account creation and management
+  - `TorqueAccountBundler.sol`: Operation bundling and execution
+  - `TorqueAccountRecovery.sol`: Account recovery and guardian management
+  - `TorqueAccountUpgrade.sol`: Account upgrades and leverage changes
+  - `TorqueAccountGasOptimizer.sol`: Gas optimization for operations
+  - `TorqueAccountCrossChain.sol`: Cross-chain account operations
+  - `EntryPoint.sol`: ERC-4337 entry point contract
 - `currencies/`: Currency-specific contracts
 - `engines/`: Currency-specific engines
 
@@ -76,9 +84,9 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/torque_fx.git
+git clone https://github.com/torquefi/torque_fx.git
 cd torque_fx
-npm install
+yarn
 ```
 
 ### Development
