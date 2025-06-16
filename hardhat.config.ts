@@ -53,10 +53,13 @@ const config: HardhatUserConfig = {
     // baseGoerli: {
     //   url: process.env.BASE_GOERLI_RPC_URL || "",
     //   accounts: [process.env.PRIVATE_KEY || ""],
-    // },
+    },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {
+      ethereum: process.env.ETHERSCAN_API_KEY,
+      arbitrum: process.env.ARBISCAN_API_KEY,
+    }
   },
   layerzero: {
     ethereum: {
