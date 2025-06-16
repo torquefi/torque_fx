@@ -17,23 +17,16 @@ describe("TorqueAccount", function () {
 
   describe("Account Creation", function () {
     it("should create a new account", async function () {
-      await torqueAccount.connect(user).createAccount(2000, false, "testuser", ethers.ZeroAddress);
+      await torqueAccount.connect(user).createAccount(2000, "testuser", ethers.ZeroAddress);
       const account = await torqueAccount.userAccounts(user.address, 1);
       expect(account.leverage).to.equal(2000);
       expect(account.exists).to.be.true;
-      expect(account.isDemo).to.be.false;
       expect(account.active).to.be.true;
       expect(account.username).to.equal("testuser");
     });
 
-    it("should create a demo account", async function () {
-      await torqueAccount.connect(user).createAccount(1000, true, "demouser", ethers.ZeroAddress);
-      const account = await torqueAccount.userAccounts(user.address, 1);
-      expect(account.isDemo).to.be.true;
-    });
-
     it("should create account with referrer", async function () {
-      await torqueAccount.connect(user).createAccount(2000, false, "testuser", referrer.address);
+      await torqueAccount.connect(user).createAccount(2000, "testuser", referrer.address);
       const account = await torqueAccount.userAccounts(user.address, 1);
       expect(account.referrer).to.equal(referrer.address);
       
@@ -42,22 +35,22 @@ describe("TorqueAccount", function () {
     });
 
     it("should not allow duplicate usernames", async function () {
-      await torqueAccount.connect(user).createAccount(2000, false, "testuser", ethers.ZeroAddress);
+      await torqueAccount.connect(user).createAccount(2000, "testuser", ethers.ZeroAddress);
       await expect(
-        torqueAccount.connect(referrer).createAccount(2000, false, "testuser", ethers.ZeroAddress)
+        torqueAccount.connect(referrer).createAccount(2000, "testuser", ethers.ZeroAddress)
       ).to.be.revertedWith("Username taken");
     });
 
     it("should not allow self-referral", async function () {
       await expect(
-        torqueAccount.connect(user).createAccount(2000, false, "testuser", user.address)
+        torqueAccount.connect(user).createAccount(2000, "testuser", user.address)
       ).to.be.revertedWith("Cannot refer self");
     });
   });
 
   describe("Account Management", function () {
     beforeEach(async function () {
-      await torqueAccount.connect(user).createAccount(2000, false, "testuser", ethers.ZeroAddress);
+      await torqueAccount.connect(user).createAccount(2000, "testuser", ethers.ZeroAddress);
     });
 
     it("should update leverage", async function () {
@@ -86,7 +79,7 @@ describe("TorqueAccount", function () {
 
     it("should not allow invalid username length", async function () {
       await expect(
-        torqueAccount.connect(user).createAccount(2000, false, "ab", ethers.ZeroAddress)
+        torqueAccount.connect(user).createAccount(2000, "ab", ethers.ZeroAddress)
       ).to.be.revertedWith("Username length invalid");
     });
   });
@@ -96,7 +89,6 @@ describe("TorqueAccount", function () {
       for (let i = 0; i < 10; i++) {
         await torqueAccount.connect(user).createAccount(
           2000,
-          false,
           `testuser${i}`,
           ethers.ZeroAddress
         );
@@ -109,13 +101,12 @@ describe("TorqueAccount", function () {
       for (let i = 0; i < 10; i++) {
         await torqueAccount.connect(user).createAccount(
           2000,
-          false,
           `testuser${i}`,
           ethers.ZeroAddress
         );
       }
       await expect(
-        torqueAccount.connect(user).createAccount(2000, false, "testuser11", ethers.ZeroAddress)
+        torqueAccount.connect(user).createAccount(2000, "testuser11", ethers.ZeroAddress)
       ).to.be.revertedWith("Max accounts reached");
     });
   });

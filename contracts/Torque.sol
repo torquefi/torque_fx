@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.19;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { ERC20Burnable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import { ERC20Votes } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-import { OFT } from "@layerzerolabs/oft-evm/contracts/OFT.sol";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Torque is ERC20Burnable, ERC20Permit, ERC20Votes, OFT, Ownable {
     event Minted(address indexed to, uint256 amount);
@@ -15,11 +15,15 @@ contract Torque is ERC20Burnable, ERC20Permit, ERC20Votes, OFT, Ownable {
         string memory _name,
         string memory _symbol,
         address _lzEndpoint,
-        address _delegate
-    ) OFT(_name, _symbol, _lzEndpoint) ERC20Permit(_name) Ownable(_delegate) {
-        uint256 initialSupply = 1_000_000_000_000 * 10 ** decimals();
-        _mint(_delegate, initialSupply);
-        emit Minted(_delegate, initialSupply);
+        address _owner
+    ) 
+        OFT(_name, _symbol, _lzEndpoint, _owner)
+        ERC20Permit(_name)
+        Ownable(_owner)
+    {
+        uint256 initialSupply = 1_000_000_000 * 10 ** decimals();
+        _mint(_owner, initialSupply);
+        emit Minted(_owner, initialSupply);
     }
 
     function _afterTokenTransfer(

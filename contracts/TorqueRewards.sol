@@ -4,19 +4,17 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./4337/TorqueAccount.sol";
 
 interface ITorqueAccount {
-    function userAccounts(address user, uint256 accountId)
-        external
-        view
-        returns (
-            uint256 leverage,
-            bool exists,
-            bool isDemo,
-            bool active,
-            string memory username,
-            address referrer
-        );
+    function userAccounts(address user, uint256 accountId) external view returns (
+        uint256 leverage,
+        bool exists,
+        bool active,
+        string memory username,
+        address referrer
+    );
+    function isValidAccount(address user, uint256 accountId) external view returns (bool);
 }
 
 contract TorqueRewards is Ownable, ReentrancyGuard {
@@ -135,7 +133,7 @@ contract TorqueRewards is Ownable, ReentrancyGuard {
     }
 
     function isValidAccount(address user, uint256 accountId) public view returns (bool) {
-        (, bool exists, , bool active, , ) = torqueAccount.userAccounts(user, accountId);
+        (, bool exists, bool active, , ) = torqueAccount.userAccounts(user, accountId);
         return exists && active;
     }
 }

@@ -2,6 +2,8 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-etherscan";
 import "dotenv/config";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.19",
@@ -58,26 +60,21 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
-  layerzero: {
-    ethereum: {
-      endpoint: process.env.ETHEREUM_LZ_ENDPOINT || "",
-    },
-    arbitrum: {
-      endpoint: process.env.ARBITRUM_LZ_ENDPOINT || "",
-    },
-    optimism: {
-      endpoint: process.env.OPTIMISM_LZ_ENDPOINT || "",
-    },
-    polygon: {
-      endpoint: process.env.POLYGON_LZ_ENDPOINT || "",
-    },
-    sonic: {
-      endpoint: process.env.SONIC_LZ_ENDPOINT || "",
-    },
-    base: {
-      endpoint: process.env.BASE_LZ_ENDPOINT || "",
-    },
-  },
+};
+
+export const layerzeroEndpoints = {
+  ethereum: "0x1a44076050125825900e736c501f859c50fE728c",
+  arbitrum: "0x1a44076050125825900e736c501f859c50fE728c",
+  // optimism: "0x1a44076050125825900e736c501f859c50fE728c",
+  // polygon: "0x1a44076050125825900e736c501f859c50fE728c",
+  // sonic: "0x6F475642a6e85809B1c36Fa62763669b1b48DD5B",
+  // base: "0x1a44076050125825900e736c501f859c50fE728c",
+  // sepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
+  // arbitrumSepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
+  // optimismSepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
+  // polygonAmoy: "0x6EDCE65403992e310A62460808c4b910D972f10f",
+  // sonicTestnet: "#",
+  // baseSepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
 };
 
 export default config;

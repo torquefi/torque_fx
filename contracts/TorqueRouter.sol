@@ -3,19 +3,17 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "./4337/TorqueAccount.sol";
 
 interface ITorqueAccount {
-    function userAccounts(address user, uint256 accountId)
-        external
-        view
-        returns (
-            uint256 leverage,
-            bool exists,
-            bool isDemo,
-            bool active,
-            string memory username,
-            address referrer
-        );
+    function userAccounts(address user, uint256 accountId) external view returns (
+        uint256 leverage,
+        bool exists,
+        bool active,
+        string memory username,
+        address referrer
+    );
+    function isValidAccount(address user, uint256 accountId) external view returns (bool);
 }
 
 contract TorqueRouter is Ownable {

@@ -5,18 +5,36 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "./4337/TorqueAccount.sol";
 
 interface ITorqueAccount {
     function getLeverage(address user, uint256 accountId) external view returns (uint256);
     function userAccounts(address user, uint256 accountId) external view returns (
-        uint256 leverage, bool exists, bool isDemo, bool active, string memory username, address referrer
+        uint256 leverage, bool exists, bool active, string memory username, address referrer
     );
+    function isValidAccount(address user, uint256 accountId) external view returns (bool);
+    function openPosition(
+        uint256 accountId,
+        uint256 positionId,
+        address baseToken,
+        address quoteToken,
+        uint256 collateral,
+        uint256 positionSize,
+        uint256 entryPrice,
+        bool isLong
+    ) external;
+    function closePosition(
+        uint256 accountId,
+        uint256 positionId,
+        int256 pnl
+    ) external;
 }
 
 interface ITorqueDEX {
     function swap(address inputToken, uint256 inputAmount, uint256 accountId) external returns (uint256 outputAmount);
     function token0() external view returns (address);
     function token1() external view returns (address);
+    function getPrice(address baseToken, address quoteToken) external view returns (uint256);
 }
 
 contract TorqueFX is Ownable, ReentrancyGuard {
@@ -31,6 +49,13 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 lastLiquidationAmount;
         uint256 stopLossPrice;
         uint256 takeProfitPrice;
+        uint256 positionSize;
+        uint256 positionId;
+        uint256 closePrice;
+        int256 pnl;
+        bool isOpen;
+        address baseToken;
+        address quoteToken;
     }
 
     struct Order {
@@ -45,9 +70,24 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 leverage;
     }
 
+    struct PoolPosition {
+        uint256 longExposure;
+        uint256 shortExposure;
+        uint256 totalCollateral;
+        uint256 lastHedgeTime;
+        uint256 lastHedgePrice;
+    }
+
+    struct MarketData {
+        uint256 longInterest;
+        uint256 shortInterest;
+        uint256 totalVolume;
+        uint256 lastUpdate;
+    }
+
     IERC20 public immutable usdc;
-    ITorqueAccount public torqueAccount;
-    ITorqueDEX public torqueDEX;
+    ITorqueAccount public immutable accountContract;
+    ITorqueDEX public immutable dexContract;
     address public feeRecipient;
 
     uint256 public openFeeBps = 5;
@@ -62,8 +102,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     uint256 public constant LIQUIDATION_INCENTIVE = 1000;
     bool public circuitBreaker;
     uint256 public lastPriceUpdate;
-    uint256 public constant POSITION_COOLDOWN = 5 minutes;
-    uint256 public constant MAX_DAILY_VOLUME = 1000000e6;
     uint256 public constant MAX_PRICE_IMPACT = 500;
     uint256 public constant MAX_SLIPPAGE = 100;
 
@@ -73,10 +111,12 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     mapping(address => uint256) public userTotalExposure;
     mapping(address => Order[]) public pendingOrders;
     mapping(address => uint256) public orderCount;
-    mapping(address => uint256) public lastTradeTimestamp;
-    mapping(address => uint256) public dailyVolume;
-    uint256 public lastVolumeReset;
     mapping(address => bool) public addressCircuitBreaker;
+    mapping(bytes32 => PoolPosition) public poolPositions;
+    mapping(bytes32 => MarketData) public marketData;
+    mapping(bytes32 => uint256) public poolLiquidity;
+    mapping(bytes32 => uint256) public maxPoolExposure;
+    mapping(bytes32 => uint256) public hedgeThreshold;
 
     event PositionOpened(address indexed user, bytes32 indexed pair, uint256 collateral, uint256 leverage, bool isLong, uint256 accountId, int256 entryPrice);
     event PositionClosed(address indexed user, bytes32 indexed pair, int256 pnl, uint256 collateralReturned, uint256 feeCharged);
@@ -91,6 +131,10 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     event MaxPositionSizeUpdated(uint256 size);
     event DEXPoolUpdated(bytes32 indexed pair, address pool);
     event AddressCircuitBreakerToggled(address indexed target, bool paused);
+    event PoolPositionUpdated(bytes32 indexed pair, uint256 longExposure, uint256 shortExposure, uint256 totalCollateral);
+    event MarketDataUpdated(bytes32 indexed pair, uint256 longInterest, uint256 shortInterest, uint256 totalVolume);
+    event PoolLiquidityUpdated(bytes32 indexed pair, uint256 amount);
+    event PositionHedged(bytes32 indexed pair, uint256 amount, bool isLong);
 
     modifier whenAddressNotPaused(address target) {
         require(!addressCircuitBreaker[target], "Address is paused");
@@ -98,15 +142,14 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     constructor(
-        address _usdc, 
-        address _torqueAccount,
-        address _torqueDEX
+        address _accountContract,
+        address _dexContract,
+        address _usdc
     ) {
+        accountContract = ITorqueAccount(_accountContract);
+        dexContract = ITorqueDEX(_dexContract);
         usdc = IERC20(_usdc);
-        torqueAccount = ITorqueAccount(_torqueAccount);
-        torqueDEX = ITorqueDEX(_torqueDEX);
         feeRecipient = msg.sender;
-        lastVolumeReset = block.timestamp;
     }
 
     function setDEXPool(bytes32 pair, address pool) external onlyOwner {
@@ -126,8 +169,8 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         require(priceFeeds[pair] != address(0), "Pair not allowed");
         require(orderCount[msg.sender] < MAX_PENDING_ORDERS, "Too many pending orders");
         
-        (uint256 leverage, bool exists, bool isDemo, bool active,,) = torqueAccount.userAccounts(msg.sender, accountId);
-        require(exists && active && !isDemo, "Invalid account");
+        (uint256 leverage, bool exists, bool active,,) = accountContract.userAccounts(msg.sender, accountId);
+        require(exists && active, "Invalid account");
         require(leverage >= 100 && leverage <= 10000, "Invalid leverage");
 
         _checkPositionSize(collateral, leverage);
@@ -200,106 +243,227 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     function openPosition(
-        bytes32 pair,
-        uint256 collateral,
-        bool isLong,
         uint256 accountId,
-        int256 expectedPrice
-    ) external nonReentrant whenAddressNotPaused(msg.sender) {
-        require(priceFeeds[pair] != address(0), "Pair not allowed");
-        require(dexPools[pair] != address(0), "DEX pool not set");
-        require(positions[msg.sender][pair].collateral == 0, "Position exists");
+        address baseToken,
+        address quoteToken,
+        uint256 collateral,
+        uint256 leverage,
+        bool isLong
+    ) external returns (uint256 positionId) {
+        require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
+        require(collateral > 0, "Invalid collateral");
+        require(leverage >= 1 && leverage <= 10000, "Invalid leverage");
 
-        (uint256 leverage, bool exists, bool isDemo, bool active,,) = torqueAccount.userAccounts(msg.sender, accountId);
-        require(exists && active && !isDemo, "Invalid account");
-        require(leverage >= 100 && leverage <= 10000, "Invalid leverage");
+        // Calculate position size
+        uint256 positionSize = collateral * leverage;
+        
+        // Get current price from DEX
+        uint256 price = dexContract.getPrice(baseToken, quoteToken);
+        require(price > 0, "Invalid price");
 
-        _checkPositionSize(collateral, leverage);
-        _checkCircuitBreaker();
-        _checkTradingLimits(msg.sender, collateral * leverage / 100);
+        // Calculate required tokens for position
+        uint256 requiredTokens = isLong ? 
+            (positionSize * 1e18) / price : 
+            (positionSize * price) / 1e18;
 
-        int256 price = getLatestPrice(pair);
-        _checkSlippage(expectedPrice, price, isLong);
-        _checkPriceImpact(price, price, isLong);
+        // Transfer collateral from account
+        usdc.transferFrom(msg.sender, address(this), collateral);
 
-        uint256 notionalValue = collateral * leverage / 100;
-        uint256 fee = (notionalValue * openFeeBps) / 10000;
-        uint256 totalCost = collateral + fee;
+        // Execute swap through DEX
+        uint256 tokensReceived = dexContract.swap(
+            isLong ? quoteToken : baseToken,
+            requiredTokens,
+            accountId
+        );
 
-        require(usdc.transferFrom(msg.sender, address(this), totalCost), "Transfer failed");
-        require(usdc.transfer(feeRecipient, fee), "Fee transfer failed");
+        // Create position
+        positionId = _createPosition(
+            accountId,
+            baseToken,
+            quoteToken,
+            collateral,
+            positionSize,
+            price,
+            isLong
+        );
 
-        if (isLong) {
-            ITorqueDEX(dexPools[pair]).swap(address(usdc), collateral, accountId);
-        }
+        // Update account position
+        accountContract.openPosition(
+            accountId,
+            positionId,
+            baseToken,
+            quoteToken,
+            collateral,
+            positionSize,
+            price,
+            isLong
+        );
 
-        positions[msg.sender][pair] = Position({
+        emit PositionOpened(
+            msg.sender,
+            accountId,
+            positionId,
+            baseToken,
+            quoteToken,
+            collateral,
+            positionSize,
+            price,
+            isLong
+        );
+    }
+
+    function _createPosition(
+        uint256 accountId,
+        address baseToken,
+        address quoteToken,
+        uint256 collateral,
+        uint256 positionSize,
+        uint256 price,
+        bool isLong
+    ) internal returns (uint256 positionId) {
+        positionId = positions[msg.sender].length;
+        positions[msg.sender][positionId] = Position({
             collateral: collateral,
             entryPrice: price,
             isLong: isLong,
             accountId: accountId,
             lastLiquidationAmount: 0,
             stopLossPrice: 0,
-            takeProfitPrice: 0
+            takeProfitPrice: 0,
+            positionSize: positionSize,
+            positionId: positionId,
+            closePrice: 0,
+            pnl: 0,
+            isOpen: true,
+            baseToken: baseToken,
+            quoteToken: quoteToken
         });
+        return positionId;
+    }
 
-        userTotalExposure[msg.sender] += notionalValue;
+    function _checkAndHedgePool(bytes32 pair) internal {
+        PoolPosition storage pool = poolPositions[pair];
+        uint256 netExposure;
+        bool isLong;
 
-        emit PositionOpened(msg.sender, pair, collateral, leverage, isLong, accountId, price);
+        if (pool.longExposure > pool.shortExposure) {
+            netExposure = pool.longExposure - pool.shortExposure;
+            isLong = true;
+        } else {
+            netExposure = pool.shortExposure - pool.longExposure;
+            isLong = false;
+        }
+
+        if (netExposure > hedgeThreshold[pair]) {
+            // Only hedge the excess exposure
+            uint256 hedgeAmount = netExposure - hedgeThreshold[pair];
+            
+            // Perform hedge in real market
+            if (isLong) {
+                // Hedge by going short in real market
+                ITorqueDEX(dexPools[pair]).swap(address(usdc), hedgeAmount, 0);
+            } else {
+                // Hedge by going long in real market
+                ITorqueDEX(dexPools[pair]).swap(address(usdc), hedgeAmount, 0);
+            }
+
+            pool.lastHedgeTime = block.timestamp;
+            pool.lastHedgePrice = uint256(getLatestPrice(pair));
+
+            emit PositionHedged(pair, hedgeAmount, isLong);
+        }
+    }
+
+    function setHedgeThreshold(bytes32 pair, uint256 threshold) external onlyOwner {
+        hedgeThreshold[pair] = threshold;
+    }
+
+    function setMaxPoolExposure(bytes32 pair, uint256 maxExposure) external onlyOwner {
+        maxPoolExposure[pair] = maxExposure;
+    }
+
+    function addPoolLiquidity(bytes32 pair, uint256 amount) external onlyOwner {
+        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        poolLiquidity[pair] += amount;
+        emit PoolLiquidityUpdated(pair, poolLiquidity[pair]);
+    }
+
+    function removePoolLiquidity(bytes32 pair, uint256 amount) external onlyOwner {
+        require(amount <= poolLiquidity[pair], "Insufficient liquidity");
+        poolLiquidity[pair] -= amount;
+        require(usdc.transfer(msg.sender, amount), "Transfer failed");
+        emit PoolLiquidityUpdated(pair, poolLiquidity[pair]);
     }
 
     function closePosition(
-        bytes32 pair,
-        int256 expectedPrice
-    ) external nonReentrant whenAddressNotPaused(msg.sender) {
-        Position storage pos = positions[msg.sender][pair];
-        require(pos.collateral > 0, "No position");
-
-        int256 currentPrice = getLatestPrice(pair);
-        _checkSlippage(expectedPrice, currentPrice, pos.isLong);
-
-        uint256 notionalValue = pos.collateral * torqueAccount.getLeverage(msg.sender, pos.accountId) / 100;
-        uint256 fee = (notionalValue * closeFeeBps) / 10000;
+        uint256 accountId,
+        uint256 positionId
+    ) external returns (uint256 pnl) {
+        require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
         
-        int256 pnl = pos.isLong 
-            ? int256((currentPrice - pos.entryPrice) * int256(pos.collateral) / pos.entryPrice)
-            : int256((pos.entryPrice - currentPrice) * int256(pos.collateral) / pos.entryPrice);
+        Position storage position = positions[positionId];
+        require(position.accountId == accountId, "Position not found");
+        require(position.isOpen, "Position closed");
 
-        uint256 collateralReturned;
+        // Get current price from DEX
+        uint256 currentPrice = dexContract.getPrice(
+            position.baseToken,
+            position.quoteToken
+        );
+        require(currentPrice > 0, "Invalid price");
+
+        // Calculate PnL
+        pnl = _calculatePnL(
+            position,
+            currentPrice
+        );
+
+        // Execute reverse swap through DEX
+        uint256 tokensToSwap = position.isLong ?
+            (position.positionSize * 1e18) / position.entryPrice :
+            (position.positionSize * position.entryPrice) / 1e18;
+
+        uint256 tokensReceived = dexContract.swap(
+            position.isLong ? position.baseToken : position.quoteToken,
+            tokensToSwap,
+            accountId
+        );
+
+        // Close position
+        position.isOpen = false;
+        position.closePrice = currentPrice;
+        position.pnl = pnl;
+
+        // Update account position
+        accountContract.closePosition(
+            accountId,
+            positionId,
+            pnl
+        );
+
+        // Transfer funds back to account
         if (pnl > 0) {
-            collateralReturned = pos.collateral + uint256(pnl) - fee;
-        } else {
-            collateralReturned = pos.collateral > uint256(-pnl) + fee 
-                ? pos.collateral - uint256(-pnl) - fee 
-                : 0;
+            usdc.transfer(msg.sender, pnl);
         }
 
-        if (pos.isLong) {
-            ITorqueDEX(dexPools[pair]).swap(address(usdc), collateralReturned, pos.accountId);
-        }
-
-        userTotalExposure[msg.sender] -= notionalValue;
-        delete positions[msg.sender][pair];
-
-        if (collateralReturned > 0) {
-            require(usdc.transfer(msg.sender, collateralReturned), "Transfer failed");
-        }
-        if (fee > 0) {
-            require(usdc.transfer(feeRecipient, fee), "Fee transfer failed");
-        }
-
-        emit PositionClosed(msg.sender, pair, pnl, collateralReturned, fee);
+        emit PositionClosed(
+            msg.sender,
+            positionId,
+            currentPrice,
+            pnl
+        );
     }
 
     function liquidate(
         address user,
         bytes32 pair
     ) external nonReentrant whenAddressNotPaused(user) {
+        // CHECKS
         Position storage pos = positions[user][pair];
         require(pos.collateral > 0, "No position");
 
         int256 currentPrice = getLatestPrice(pair);
-        uint256 leverage = torqueAccount.getLeverage(user, pos.accountId);
+        uint256 leverage = accountContract.getLeverage(user, pos.accountId);
         uint256 notionalValue = pos.collateral * leverage / 100;
         
         int256 pnl = pos.isLong 
@@ -309,6 +473,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 healthFactor = _calculateHealthFactor(pos.collateral, notionalValue, pnl);
         require(healthFactor >= fullLiquidationThreshold, "Position not liquidatable");
 
+        // EFFECTS
         uint256 fee = (notionalValue * closeFeeBps) / 10000;
         uint256 liquidationAmount = pos.collateral;
         bool isFullLiquidation = healthFactor >= fullLiquidationThreshold;
@@ -326,6 +491,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
         userTotalExposure[user] -= notionalValue;
 
+        // INTERACTIONS
         if (remainingAmount > 0) {
             require(usdc.transfer(user, remainingAmount), "Transfer failed");
         }
@@ -360,12 +526,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     function _checkTradingLimits(address user, uint256 notionalValue) internal {
-        if (block.timestamp - lastVolumeReset >= 1 days) {
-            dailyVolume[user] = 0;
-            lastVolumeReset = block.timestamp;
-        }
-        require(dailyVolume[user] + notionalValue <= MAX_DAILY_VOLUME, "Daily volume limit exceeded");
-        dailyVolume[user] += notionalValue;
+        // Removed daily volume limit check
     }
 
     function getLatestPrice(bytes32 pair) public view returns (int256) {
@@ -414,5 +575,14 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     function toggleAddressCircuitBreaker(address target) external onlyOwner {
         addressCircuitBreaker[target] = !addressCircuitBreaker[target];
         emit AddressCircuitBreakerToggled(target, addressCircuitBreaker[target]);
+    }
+
+    function _calculatePnL(Position storage position, uint256 currentPrice) internal view returns (int256 pnl) {
+        if (position.isLong) {
+            pnl = int256((currentPrice - position.entryPrice) * int256(position.collateral) / position.entryPrice);
+        } else {
+            pnl = int256((position.entryPrice - currentPrice) * int256(position.collateral) / position.entryPrice);
+        }
+        return pnl;
     }
 }
