@@ -45,7 +45,15 @@ contract TorqueGBPEngine is TorqueEngine {
         bytes calldata dstAddress,
         bytes calldata adapterParams
     ) external payable moreThanZero(amountCollateral) {
+        // CHECKS
+        require(amountCollateral > 0, "Amount must be greater than 0");
+        require(amountTorqueGBPToMint > 0, "Mint amount must be greater than 0");
+        require(dstChainId > 0, "Invalid destination chain");
+
+        // EFFECTS
         depositCollateral(amountCollateral);
+
+        // INTERACTIONS
         _lzSend(
             dstChainId,
             abi.encode(amountTorqueGBPToMint, msg.sender),
@@ -61,6 +69,10 @@ contract TorqueGBPEngine is TorqueEngine {
         uint64,
         bytes memory _payload
     ) internal override {
+        // CHECKS
+        require(_payload.length > 0, "Invalid payload");
+
+        // EFFECTS
         (uint256 amountTorqueGBPToMint, address user) = abi.decode(_payload, (uint256, address));
         _mintTorque(amountTorqueGBPToMint, user);
     }
@@ -72,8 +84,16 @@ contract TorqueGBPEngine is TorqueEngine {
         bytes calldata dstAddress,
         bytes calldata adapterParams
     ) external moreThanZero(amountCollateral) {
+        // CHECKS
+        require(amountCollateral > 0, "Amount must be greater than 0");
+        require(amountTorqueGBPToBurn > 0, "Burn amount must be greater than 0");
+        require(dstChainId > 0, "Invalid destination chain");
+
+        // EFFECTS
         _burnTorque(amountTorqueGBPToBurn, msg.sender);
         _redeemCollateral(amountCollateral, msg.sender, msg.sender);
+
+        // INTERACTIONS
         _lzSend(
             dstChainId,
             abi.encode(amountTorqueGBPToBurn, msg.sender),
@@ -84,14 +104,23 @@ contract TorqueGBPEngine is TorqueEngine {
     }
 
     function liquidate(address user, uint256 debtToCover) external moreThanZero(debtToCover) nonReentrant {
+        // CHECKS
+        require(user != address(0), "Invalid user");
+        require(debtToCover > 0, "Debt to cover must be greater than 0");
         uint256 startingUserHealthFactor = _healthFactor(user);
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
             revert TorqueEngine__HealthFactorOk();
         }
+
+        // Calculate amounts
         uint256 tokenAmountFromDebtCovered = getTokenAmountFromGbp(debtToCover);
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / 100;
+
+        // EFFECTS
         _redeemCollateral(tokenAmountFromDebtCovered + bonusCollateral, user, msg.sender);
         _burnTorque(debtToCover, user);
+
+        // Verify health factor improvement
         uint256 endingUserHealthFactor = _healthFactor(user);
         if (endingUserHealthFactor <= startingUserHealthFactor) {
             revert TorqueEngine__HealthFactorNotImproved();
