@@ -21,119 +21,85 @@ contract TorqueRewards is Ownable, ReentrancyGuard {
     IERC20 public rewardToken;
     ITorqueAccount public torqueAccount;
 
-    uint256 public constant REWARD_DURATION = 7 days;
-    uint256 public constant MIN_STAKE_AMOUNT = 100e18;
-    uint256 public constant MAX_STAKE_AMOUNT = 1000000e18;
+    // Reward rates (in basis points)
+    uint256 public referralRewardBps = 100; // 1% referral reward
+    uint256 public cashbackRewardBps = 50;  // 0.5% trading cashback
 
-    uint256 public rewardRate;
-    uint256 public periodFinish;
-    uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;
-
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
-    mapping(address => uint256) public stakedBalance;
-    mapping(address => uint256) public lastStakeTime;
+    // Reward tracking
+    mapping(address => uint256) public referralRewards;
+    mapping(address => uint256) public cashbackRewards;
     mapping(address => uint256) public totalEarned;
 
-    event RewardAdded(uint256 reward);
-    event Staked(address indexed user, uint256 amount);
-    event Withdrawn(address indexed user, uint256 amount);
-    event RewardPaid(address indexed user, uint256 reward);
-    event RewardRateUpdated(uint256 newRate);
+    event ReferralRewardPaid(address indexed referrer, address indexed trader, uint256 amount);
+    event CashbackRewardPaid(address indexed trader, uint256 amount);
+    event RewardRatesUpdated(uint256 referralBps, uint256 cashbackBps);
 
     constructor(address _rewardToken, address _torqueAccount) {
         rewardToken = IERC20(_rewardToken);
         torqueAccount = ITorqueAccount(_torqueAccount);
     }
 
-    function stake(uint256 amount, uint256 accountId) external nonReentrant {
-        require(isValidAccount(msg.sender, accountId), "Invalid account");
-        require(amount >= MIN_STAKE_AMOUNT, "Below minimum stake");
-        require(amount <= MAX_STAKE_AMOUNT, "Above maximum stake");
-        require(stakedBalance[msg.sender] + amount <= MAX_STAKE_AMOUNT, "Total stake too high");
-
-        updateReward(msg.sender);
-
-        rewardToken.transferFrom(msg.sender, address(this), amount);
-        stakedBalance[msg.sender] += amount;
-        lastStakeTime[msg.sender] = block.timestamp;
-
-        emit Staked(msg.sender, amount);
-    }
-
-    function withdraw(uint256 amount) external nonReentrant {
-        require(amount > 0, "Cannot withdraw 0");
-        require(stakedBalance[msg.sender] >= amount, "Insufficient stake");
-
-        updateReward(msg.sender);
-
-        stakedBalance[msg.sender] -= amount;
-        rewardToken.transfer(msg.sender, amount);
-
-        emit Withdrawn(msg.sender, amount);
-    }
-
-    function getReward() external nonReentrant {
-        updateReward(msg.sender);
-
-        uint256 reward = rewards[msg.sender];
-        if (reward > 0) {
-            rewards[msg.sender] = 0;
-            totalEarned[msg.sender] += reward;
-            rewardToken.transfer(msg.sender, reward);
-            emit RewardPaid(msg.sender, reward);
+    function distributeReferralReward(
+        address trader,
+        uint256 accountId,
+        uint256 tradeAmount
+    ) external {
+        require(msg.sender == address(torqueAccount), "Only TorqueAccount");
+        
+        (, , , , address referrer) = torqueAccount.userAccounts(trader, accountId);
+        if (referrer != address(0)) {
+            uint256 reward = (tradeAmount * referralRewardBps) / 10000;
+            referralRewards[referrer] += reward;
+            totalEarned[referrer] += reward;
+            emit ReferralRewardPaid(referrer, trader, reward);
         }
     }
 
-    function exit() external {
-        withdraw(stakedBalance[msg.sender]);
-        getReward();
+    function distributeCashbackReward(
+        address trader,
+        uint256 tradeAmount
+    ) external {
+        require(msg.sender == address(torqueAccount), "Only TorqueAccount");
+        
+        uint256 reward = (tradeAmount * cashbackRewardBps) / 10000;
+        cashbackRewards[trader] += reward;
+        totalEarned[trader] += reward;
+        emit CashbackRewardPaid(trader, reward);
     }
 
-    function updateReward(address account) public {
-        rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = lastTimeRewardApplicable();
-
-        if (account != address(0)) {
-            rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
-        }
+    function claimReferralRewards() external nonReentrant {
+        uint256 reward = referralRewards[msg.sender];
+        require(reward > 0, "No rewards to claim");
+        
+        referralRewards[msg.sender] = 0;
+        rewardToken.transfer(msg.sender, reward);
     }
 
-    function lastTimeRewardApplicable() public view returns (uint256) {
-        return block.timestamp < periodFinish ? block.timestamp : periodFinish;
+    function claimCashbackRewards() external nonReentrant {
+        uint256 reward = cashbackRewards[msg.sender];
+        require(reward > 0, "No rewards to claim");
+        
+        cashbackRewards[msg.sender] = 0;
+        rewardToken.transfer(msg.sender, reward);
     }
 
-    function rewardPerToken() public view returns (uint256) {
-        if (stakedBalance[address(0)] == 0) {
-            return rewardPerTokenStored;
-        }
-
-        return rewardPerTokenStored + (
-            (lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * 1e18
-        ) / stakedBalance[address(0)];
+    function setRewardRates(uint256 _referralBps, uint256 _cashbackBps) external onlyOwner {
+        require(_referralBps <= 1000, "Referral rate too high"); // Max 10%
+        require(_cashbackBps <= 500, "Cashback rate too high");  // Max 5%
+        
+        referralRewardBps = _referralBps;
+        cashbackRewardBps = _cashbackBps;
+        
+        emit RewardRatesUpdated(_referralBps, _cashbackBps);
     }
 
-    function earned(address account) public view returns (uint256) {
-        return (
-            stakedBalance[account] * (rewardPerToken() - userRewardPerTokenPaid[account])
-        ) / 1e18 + rewards[account];
-    }
-
-    function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        require(_rewardRate > 0, "Invalid rate");
-        updateReward(address(0));
-
-        rewardRate = _rewardRate;
-        periodFinish = block.timestamp + REWARD_DURATION;
-        lastUpdateTime = block.timestamp;
-
-        emit RewardRateUpdated(_rewardRate);
-    }
-
-    function isValidAccount(address user, uint256 accountId) public view returns (bool) {
-        (, bool exists, bool active, , ) = torqueAccount.userAccounts(user, accountId);
-        return exists && active;
+    function getTotalRewards(address user) external view returns (
+        uint256 referral,
+        uint256 cashback,
+        uint256 total
+    ) {
+        referral = referralRewards[user];
+        cashback = cashbackRewards[user];
+        total = totalEarned[user];
     }
 }
