@@ -209,21 +209,31 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 stopLossPrice,
         uint256 takeProfitPrice
     ) external nonReentrant {
+        // CHECKS
         Position storage pos = positions[msg.sender][pair];
         require(pos.collateral > 0, "No position");
 
+        // EFFECTS
         if (newCollateral > pos.collateral) {
             uint256 additionalCollateral = newCollateral - pos.collateral;
-            require(usdc.transferFrom(msg.sender, address(this), additionalCollateral), "Transfer failed");
             pos.collateral = newCollateral;
+            pos.stopLossPrice = stopLossPrice;
+            pos.takeProfitPrice = takeProfitPrice;
+
+            // INTERACTIONS
+            require(usdc.transferFrom(msg.sender, address(this), additionalCollateral), "Transfer failed");
         } else if (newCollateral < pos.collateral) {
             uint256 reduction = pos.collateral - newCollateral;
             pos.collateral = newCollateral;
-            require(usdc.transfer(msg.sender, reduction), "Transfer failed");
-        }
+            pos.stopLossPrice = stopLossPrice;
+            pos.takeProfitPrice = takeProfitPrice;
 
-        pos.stopLossPrice = stopLossPrice;
-        pos.takeProfitPrice = takeProfitPrice;
+            // INTERACTIONS
+            require(usdc.transfer(msg.sender, reduction), "Transfer failed");
+        } else {
+            pos.stopLossPrice = stopLossPrice;
+            pos.takeProfitPrice = takeProfitPrice;
+        }
 
         emit PositionModified(msg.sender, pair, newCollateral, pos.entryPrice);
     }
@@ -250,6 +260,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 leverage,
         bool isLong
     ) external returns (uint256 positionId) {
+        // CHECKS
         require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
         require(collateral > 0, "Invalid collateral");
         require(leverage >= 1 && leverage <= 10000, "Invalid leverage");
@@ -266,17 +277,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             (positionSize * 1e18) / price : 
             (positionSize * price) / 1e18;
 
-        // Transfer collateral from account
-        usdc.transferFrom(msg.sender, address(this), collateral);
-
-        // Execute swap through DEX
-        uint256 tokensReceived = dexContract.swap(
-            isLong ? quoteToken : baseToken,
-            requiredTokens,
-            accountId
-        );
-
-        // Create position
+        // EFFECTS
         positionId = _createPosition(
             accountId,
             baseToken,
@@ -297,6 +298,16 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             positionSize,
             price,
             isLong
+        );
+
+        // INTERACTIONS
+        usdc.transferFrom(msg.sender, address(this), collateral);
+
+        // Execute swap through DEX
+        uint256 tokensReceived = dexContract.swap(
+            isLong ? quoteToken : baseToken,
+            requiredTokens,
+            accountId
         );
 
         emit PositionOpened(
@@ -342,6 +353,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     function _checkAndHedgePool(bytes32 pair) internal {
+        // CHECKS
         PoolPosition storage pool = poolPositions[pair];
         uint256 netExposure;
         bool isLong;
@@ -355,10 +367,14 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         }
 
         if (netExposure > hedgeThreshold[pair]) {
-            // Only hedge the excess exposure
+            // Calculate hedge amount
             uint256 hedgeAmount = netExposure - hedgeThreshold[pair];
             
-            // Perform hedge in real market
+            // EFFECTS
+            pool.lastHedgeTime = block.timestamp;
+            pool.lastHedgePrice = uint256(getLatestPrice(pair));
+
+            // INTERACTIONS
             if (isLong) {
                 // Hedge by going short in real market
                 ITorqueDEX(dexPools[pair]).swap(address(usdc), hedgeAmount, 0);
@@ -366,9 +382,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
                 // Hedge by going long in real market
                 ITorqueDEX(dexPools[pair]).swap(address(usdc), hedgeAmount, 0);
             }
-
-            pool.lastHedgeTime = block.timestamp;
-            pool.lastHedgePrice = uint256(getLatestPrice(pair));
 
             emit PositionHedged(pair, hedgeAmount, isLong);
         }
@@ -383,15 +396,29 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     function addPoolLiquidity(bytes32 pair, uint256 amount) external onlyOwner {
-        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        // CHECKS
+        require(amount > 0, "Invalid amount");
+
+        // EFFECTS
         poolLiquidity[pair] += amount;
+
+        // INTERACTIONS
+        require(usdc.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        
         emit PoolLiquidityUpdated(pair, poolLiquidity[pair]);
     }
 
     function removePoolLiquidity(bytes32 pair, uint256 amount) external onlyOwner {
+        // CHECKS
         require(amount <= poolLiquidity[pair], "Insufficient liquidity");
+        require(amount > 0, "Invalid amount");
+
+        // EFFECTS
         poolLiquidity[pair] -= amount;
+
+        // INTERACTIONS
         require(usdc.transfer(msg.sender, amount), "Transfer failed");
+        
         emit PoolLiquidityUpdated(pair, poolLiquidity[pair]);
     }
 
@@ -399,6 +426,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 accountId,
         uint256 positionId
     ) external returns (uint256 pnl) {
+        // CHECKS
         require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
         
         Position storage position = positions[positionId];
@@ -418,18 +446,12 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             currentPrice
         );
 
-        // Execute reverse swap through DEX
+        // Calculate tokens to swap
         uint256 tokensToSwap = position.isLong ?
             (position.positionSize * 1e18) / position.entryPrice :
             (position.positionSize * position.entryPrice) / 1e18;
 
-        uint256 tokensReceived = dexContract.swap(
-            position.isLong ? position.baseToken : position.quoteToken,
-            tokensToSwap,
-            accountId
-        );
-
-        // Close position
+        // EFFECTS
         position.isOpen = false;
         position.closePrice = currentPrice;
         position.pnl = pnl;
@@ -439,6 +461,14 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             accountId,
             positionId,
             pnl
+        );
+
+        // INTERACTIONS
+        // Execute reverse swap through DEX
+        uint256 tokensReceived = dexContract.swap(
+            position.isLong ? position.baseToken : position.quoteToken,
+            tokensToSwap,
+            accountId
         );
 
         // Transfer funds back to account

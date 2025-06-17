@@ -158,12 +158,16 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     }
 
     function withdrawETH(uint256 accountId, uint256 amount) external nonReentrant whenNotPaused {
+        // CHECKS
         require(amount > 0, "Amount must be greater than 0");
         Account storage account = userAccounts[msg.sender][accountId];
         require(account.exists && account.active, "Invalid account");
         require(ethBalances[msg.sender][accountId] >= amount, "Insufficient ETH balance");
 
+        // EFFECTS
         ethBalances[msg.sender][accountId] -= amount;
+
+        // INTERACTIONS
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "ETH transfer failed");
 
@@ -171,20 +175,28 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     }
 
     function withdrawUSDC(uint256 accountId, uint256 amount) external nonReentrant whenNotPaused {
+        // CHECKS
         require(amount > 0, "Amount must be greater than 0");
         Account storage account = userAccounts[msg.sender][accountId];
         require(account.exists && account.active, "Invalid account");
         require(usdcBalances[msg.sender][accountId] >= amount, "Insufficient USDC balance");
 
+        // EFFECTS
         usdcBalances[msg.sender][accountId] -= amount;
+
+        // INTERACTIONS
         usdc.safeTransfer(msg.sender, amount);
+        
         emit Withdraw(msg.sender, accountId, address(usdc), amount);
     }
 
     function recoverAccount(address oldOwner, address newOwner, uint256 accountId) external onlyGuardian {
+        // CHECKS
         require(userAccounts[oldOwner][accountId].exists, "Account does not exist");
         require(!userAccounts[newOwner][accountId].exists, "New owner has existing account");
+        require(oldOwner != newOwner, "Same owner");
 
+        // EFFECTS
         Account storage account = userAccounts[oldOwner][accountId];
         account.active = false;
 
@@ -205,6 +217,7 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         delete ethBalances[oldOwner][accountId];
         delete usdcBalances[oldOwner][accountId];
 
+        // INTERACTIONS (none in this case)
         emit AccountRecovered(oldOwner, newOwner, accountId);
     }
 
@@ -225,22 +238,29 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     }
 
     function depositETH(uint256 accountId) external payable nonReentrant {
+        // CHECKS
         require(msg.value > 0, "Amount must be greater than 0");
         Account storage account = userAccounts[msg.sender][accountId];
         require(account.exists && account.active, "Invalid account");
 
-        account.ethBalance += msg.value;
+        // EFFECTS
+        ethBalances[msg.sender][accountId] += msg.value;
+
+        // INTERACTIONS (none in this case as ETH is sent with the transaction)
         emit ETHDeposit(msg.sender, accountId, msg.value);
     }
 
     function depositUSDC(uint256 accountId, uint256 amount) external nonReentrant {
+        // CHECKS
         require(amount > 0, "Amount must be greater than 0");
         Account storage account = userAccounts[msg.sender][accountId];
         require(account.exists && account.active, "Invalid account");
 
+        // EFFECTS
+        usdcBalances[msg.sender][accountId] += amount;
+
+        // INTERACTIONS
         usdc.safeTransferFrom(msg.sender, address(this), amount);
-        
-        // Deposit into DEX pools
         usdc.approve(address(torqueDEX), amount);
         torqueDEX.depositLiquidity(address(usdc), amount);
         
@@ -264,12 +284,14 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         string memory username,
         address referrer
     ) external nonReentrant returns (uint256) {
+        // CHECKS
         require(accountCount[msg.sender] < MAX_ACCOUNTS, "Max accounts reached");
         require(leverage >= MIN_LEVERAGE && leverage <= MAX_LEVERAGE, "Invalid leverage");
         require(bytes(username).length <= MAX_USERNAME_LENGTH, "Username too long");
         require(!usernames[username], "Username taken");
         require(referrer != msg.sender, "Self referral");
 
+        // EFFECTS
         uint256 accountId = accountCount[msg.sender];
         userAccounts[msg.sender][accountId] = Account({
             leverage: leverage,
@@ -288,10 +310,14 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
 
         if (referrer != address(0)) {
             referralCount[referrer]++;
+        }
+
+        // INTERACTIONS (none in this case)
+        emit AccountCreated(msg.sender, accountId, leverage, username, referrer);
+        if (referrer != address(0)) {
             emit ReferralAdded(msg.sender, referrer);
         }
 
-        emit AccountCreated(msg.sender, accountId, leverage, username, referrer);
         return accountId;
     }
 

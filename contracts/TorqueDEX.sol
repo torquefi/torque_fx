@@ -86,14 +86,12 @@ contract TorqueDEX {
         int256 lowerTick,
         int256 upperTick
     ) external returns (uint256 liquidity) {
+        // CHECKS
         require(isValidAccount(msg.sender, accountId), "Invalid account");
         require(amount0 > 0 && amount1 > 0, "Zero amounts");
         require(lowerTick < upperTick, "Invalid range");
 
-        // Transfer tokens from user
-        token0.transferFrom(msg.sender, address(this), amount0);
-        token1.transferFrom(msg.sender, address(this), amount1);
-
+        // EFFECTS
         if (isStablePair) {
             liquidity = _addStableLiquidity(amount0, amount1);
         } else {
@@ -103,9 +101,6 @@ contract TorqueDEX {
         require(liquidity > 0, "Insufficient liquidity minted");
         totalLiquidity += liquidity;
 
-        // Mint LP tokens to user
-        lpToken.mint(msg.sender, liquidity);
-
         // Store range information
         userRanges[msg.sender][accountId].push(Range({
             lowerTick: lowerTick,
@@ -114,6 +109,11 @@ contract TorqueDEX {
             amount0: amount0,
             amount1: amount1
         }));
+
+        // INTERACTIONS
+        token0.transferFrom(msg.sender, address(this), amount0);
+        token1.transferFrom(msg.sender, address(this), amount1);
+        lpToken.mint(msg.sender, liquidity);
 
         emit LiquidityAdded(msg.sender, accountId, amount0, amount1, liquidity);
         emit RangeAdded(msg.sender, accountId, lowerTick, upperTick, liquidity);
@@ -233,6 +233,7 @@ contract TorqueDEX {
     }
 
     function removeLiquidity(uint256 liquidity, uint256 accountId) external returns (uint256 amount0, uint256 amount1) {
+        // CHECKS
         require(isValidAccount(msg.sender, accountId), "Invalid account");
         require(liquidity > 0, "Zero liquidity");
 
@@ -244,16 +245,14 @@ contract TorqueDEX {
         amount0 = range.amount0;
         amount1 = range.amount1;
 
-        // Burn LP tokens
-        lpToken.burn(msg.sender, liquidity);
-
-        // Transfer tokens back to user
-        token0.transfer(msg.sender, amount0);
-        token1.transfer(msg.sender, amount1);
-
-        // Update state
+        // EFFECTS
         totalLiquidity -= liquidity;
         ranges.pop();
+
+        // INTERACTIONS
+        lpToken.burn(msg.sender, liquidity);
+        token0.transfer(msg.sender, amount0);
+        token1.transfer(msg.sender, amount1);
 
         emit LiquidityRemoved(msg.sender, accountId, liquidity, amount0, amount1);
         emit RangeRemoved(msg.sender, accountId, range.lowerTick, range.upperTick, liquidity);
@@ -322,8 +321,11 @@ contract TorqueDEX {
     }
 
     function setFee(uint256 _feeBps) external {
+        // CHECKS
         require(msg.sender == feeRecipient, "Not authorized");
         require(_feeBps <= 30, "Max 0.3%");
+        
+        // EFFECTS
         feeBps = _feeBps;
     }
 

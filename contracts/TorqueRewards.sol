@@ -44,8 +44,10 @@ contract TorqueRewards is Ownable, ReentrancyGuard {
         uint256 accountId,
         uint256 tradeAmount
     ) external {
+        // CHECKS
         require(msg.sender == address(torqueAccount), "Only TorqueAccount");
         
+        // EFFECTS
         (, , , , address referrer) = torqueAccount.userAccounts(trader, accountId);
         if (referrer != address(0)) {
             uint256 reward = (tradeAmount * referralRewardBps) / 10000;
@@ -59,8 +61,10 @@ contract TorqueRewards is Ownable, ReentrancyGuard {
         address trader,
         uint256 tradeAmount
     ) external {
+        // CHECKS
         require(msg.sender == address(torqueAccount), "Only TorqueAccount");
         
+        // EFFECTS
         uint256 reward = (tradeAmount * cashbackRewardBps) / 10000;
         cashbackRewards[trader] += reward;
         totalEarned[trader] += reward;
@@ -68,25 +72,35 @@ contract TorqueRewards is Ownable, ReentrancyGuard {
     }
 
     function claimReferralRewards() external nonReentrant {
+        // CHECKS
         uint256 reward = referralRewards[msg.sender];
         require(reward > 0, "No rewards to claim");
         
+        // EFFECTS
         referralRewards[msg.sender] = 0;
+        
+        // INTERACTIONS
         rewardToken.transfer(msg.sender, reward);
     }
 
     function claimCashbackRewards() external nonReentrant {
+        // CHECKS
         uint256 reward = cashbackRewards[msg.sender];
         require(reward > 0, "No rewards to claim");
         
+        // EFFECTS
         cashbackRewards[msg.sender] = 0;
+        
+        // INTERACTIONS
         rewardToken.transfer(msg.sender, reward);
     }
 
     function setRewardRates(uint256 _referralBps, uint256 _cashbackBps) external onlyOwner {
+        // CHECKS
         require(_referralBps <= 1000, "Referral rate too high"); // Max 10%
         require(_cashbackBps <= 500, "Cashback rate too high");  // Max 5%
         
+        // EFFECTS
         referralRewardBps = _referralBps;
         cashbackRewardBps = _cashbackBps;
         

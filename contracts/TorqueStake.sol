@@ -68,14 +68,12 @@ contract TorqueStake is Ownable, ReentrancyGuard {
     }
 
     function stakeLp(uint256 amount, uint256 lockDuration) external nonReentrant {
+        // CHECKS
         require(amount > 0, "Cannot stake 0");
         require(lockDuration >= MIN_LOCK_DURATION, "Lock too short");
         require(lockDuration <= MAX_LOCK_DURATION, "Lock too long");
 
-        // Transfer LP tokens
-        lpToken.transferFrom(msg.sender, address(this), amount);
-
-        // Update stake
+        // EFFECTS
         Stake storage stake = lpStakes[msg.sender];
         if (stake.amount > 0) {
             _updateRewards(msg.sender, true);
@@ -89,18 +87,19 @@ contract TorqueStake is Ownable, ReentrancyGuard {
         // Update vote power
         _updateVotePower(msg.sender);
 
+        // INTERACTIONS
+        lpToken.transferFrom(msg.sender, address(this), amount);
+
         emit Staked(msg.sender, amount, lockDuration, true);
     }
 
     function stakeTorq(uint256 amount, uint256 lockDuration) external nonReentrant {
+        // CHECKS
         require(amount > 0, "Cannot stake 0");
         require(lockDuration >= MIN_LOCK_DURATION, "Lock too short");
         require(lockDuration <= MAX_LOCK_DURATION, "Lock too long");
 
-        // Transfer TORQ tokens
-        torqToken.transferFrom(msg.sender, address(this), amount);
-
-        // Update stake
+        // EFFECTS
         Stake storage stake = torqStakes[msg.sender];
         if (stake.amount > 0) {
             _updateRewards(msg.sender, false);
@@ -114,23 +113,26 @@ contract TorqueStake is Ownable, ReentrancyGuard {
         // Update vote power
         _updateVotePower(msg.sender);
 
+        // INTERACTIONS
+        torqToken.transferFrom(msg.sender, address(this), amount);
+
         emit Staked(msg.sender, amount, lockDuration, false);
     }
 
     function unstakeLp() external nonReentrant {
+        // CHECKS
         Stake storage stake = lpStakes[msg.sender];
         require(stake.amount > 0, "No stake");
 
+        // EFFECTS
         _updateRewards(msg.sender, true);
         uint256 amount = stake.amount;
         bool isEarly = block.timestamp < stake.lockEnd;
+        uint256 penalty = 0;
 
         if (isEarly) {
-            uint256 penalty = (amount * EARLY_EXIT_PENALTY) / 10000;
+            penalty = (amount * EARLY_EXIT_PENALTY) / 10000;
             amount -= penalty;
-            // Send penalty to treasury
-            lpToken.transfer(treasuryFeeRecipient, penalty);
-            emit EarlyExitPenaltyPaid(msg.sender, penalty, true);
         }
 
         stake.amount = 0;
@@ -141,24 +143,30 @@ contract TorqueStake is Ownable, ReentrancyGuard {
         // Update vote power
         _updateVotePower(msg.sender);
 
+        // INTERACTIONS
+        if (penalty > 0) {
+            lpToken.transfer(treasuryFeeRecipient, penalty);
+            emit EarlyExitPenaltyPaid(msg.sender, penalty, true);
+        }
         lpToken.transfer(msg.sender, amount);
+
         emit Unstaked(msg.sender, amount, true, isEarly);
     }
 
     function unstakeTorq() external nonReentrant {
+        // CHECKS
         Stake storage stake = torqStakes[msg.sender];
         require(stake.amount > 0, "No stake");
 
+        // EFFECTS
         _updateRewards(msg.sender, false);
         uint256 amount = stake.amount;
         bool isEarly = block.timestamp < stake.lockEnd;
+        uint256 penalty = 0;
 
         if (isEarly) {
-            uint256 penalty = (amount * EARLY_EXIT_PENALTY) / 10000;
+            penalty = (amount * EARLY_EXIT_PENALTY) / 10000;
             amount -= penalty;
-            // Send penalty to treasury
-            torqToken.transfer(treasuryFeeRecipient, penalty);
-            emit EarlyExitPenaltyPaid(msg.sender, penalty, false);
         }
 
         stake.amount = 0;
@@ -169,18 +177,28 @@ contract TorqueStake is Ownable, ReentrancyGuard {
         // Update vote power
         _updateVotePower(msg.sender);
 
+        // INTERACTIONS
+        if (penalty > 0) {
+            torqToken.transfer(treasuryFeeRecipient, penalty);
+            emit EarlyExitPenaltyPaid(msg.sender, penalty, false);
+        }
         torqToken.transfer(msg.sender, amount);
+
         emit Unstaked(msg.sender, amount, false, isEarly);
     }
 
     function claimRewards(bool isLp) external nonReentrant {
-        _updateRewards(msg.sender, isLp);
+        // CHECKS
         Stake storage stake = isLp ? lpStakes[msg.sender] : torqStakes[msg.sender];
-        
+        require(stake.amount > 0, "No stake");
+
+        // EFFECTS
+        _updateRewards(msg.sender, isLp);
         uint256 reward = stake.accumulatedRewards;
         require(reward > 0, "No rewards to claim");
-
         stake.accumulatedRewards = 0;
+
+        // INTERACTIONS
         rewardToken.transfer(msg.sender, reward);
         emit RewardPaid(msg.sender, reward, isLp);
     }

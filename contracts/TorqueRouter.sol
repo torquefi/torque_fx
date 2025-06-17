@@ -67,11 +67,13 @@ contract TorqueRouter is Ownable {
     }
 
     function setTokenAllowed(address token, bool allowed) external onlyOwner {
+        require(token != address(0), "Invalid token");
         allowedTokens[token] = allowed;
         emit TokenAllowed(token, allowed);
     }
 
     function setPriceFeedAllowed(address feed, bool allowed) external onlyOwner {
+        require(feed != address(0), "Invalid feed");
         allowedPriceFeeds[feed] = allowed;
         emit PriceFeedAllowed(feed, allowed);
     }

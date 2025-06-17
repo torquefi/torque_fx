@@ -55,28 +55,60 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
 
     // Core functions
     function depositCollateral(uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant {
+        // CHECKS
+        require(amountCollateral > 0, "Amount must be greater than 0");
+
+        // EFFECTS
         s_collateralDeposited[msg.sender] += amountCollateral;
+
+        // INTERACTIONS
         require(getCollateralToken().transferFrom(msg.sender, address(this), amountCollateral), "Transfer failed");
+        
         emit CollateralDeposited(msg.sender, amountCollateral);
     }
 
     function _mintTorque(uint256 amountToMint, address to) internal moreThanZero(amountToMint) {
+        // CHECKS
+        require(amountToMint > 0, "Amount must be greater than 0");
+        require(to != address(0), "Invalid recipient");
+
+        // EFFECTS
         s_torqueMinted[to] += amountToMint;
+
+        // INTERACTIONS
         require(getTorqueToken().transfer(to, amountToMint), "Mint failed");
+        
         emit TorqueMinted(to, amountToMint);
     }
 
     function _burnTorque(uint256 amountToBurn, address from) internal {
+        // CHECKS
+        require(amountToBurn > 0, "Amount must be greater than 0");
+        require(from != address(0), "Invalid sender");
         require(s_torqueMinted[from] >= amountToBurn, "Insufficient balance");
+
+        // EFFECTS
         s_torqueMinted[from] -= amountToBurn;
+
+        // INTERACTIONS
         require(getTorqueToken().transferFrom(from, address(this), amountToBurn), "Transfer failed");
+        
         emit TorqueBurned(from, amountToBurn);
     }
 
     function _redeemCollateral(uint256 amountCollateral, address from, address to) internal {
+        // CHECKS
+        require(amountCollateral > 0, "Amount must be greater than 0");
+        require(from != address(0), "Invalid sender");
+        require(to != address(0), "Invalid recipient");
         require(s_collateralDeposited[from] >= amountCollateral, "Insufficient collateral");
+
+        // EFFECTS
         s_collateralDeposited[from] -= amountCollateral;
+
+        // INTERACTIONS
         require(getCollateralToken().transfer(to, amountCollateral), "Transfer failed");
+        
         emit CollateralRedeemed(from, to, amountCollateral);
     }
 
@@ -123,8 +155,14 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     }
 
     function deployReserves(uint256 amount) external onlyOwner nonReentrant {
+        // CHECKS
         require(amount > 0, "Amount must be greater than zero");
         require(getCollateralToken().balanceOf(address(this)) >= amount, "Insufficient balance");
+        require(treasuryAddress != address(0), "Treasury not set");
+
+        // EFFECTS (none in this case)
+
+        // INTERACTIONS
         require(getCollateralToken().transfer(treasuryAddress, amount), "Transfer failed");
     }
 } 
