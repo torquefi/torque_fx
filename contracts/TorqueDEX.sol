@@ -2,9 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 import "./TorqueLP.sol";
 
-contract TorqueDEX {
+contract TorqueDEX is OApp, Ownable, ReentrancyGuard {
     IERC20 public token0;
     IERC20 public token1;
     TorqueLP public lpToken;
@@ -13,6 +16,11 @@ contract TorqueDEX {
     uint256 public feeBps = 4;
     address public feeRecipient;
 
+    // Cross-chain liquidity tracking
+    mapping(uint16 => mapping(address => uint256)) public crossChainLiquidity; // chainId => user => liquidity
+    mapping(uint16 => bool) public supportedChainIds;
+    mapping(uint16 => address) public dexAddresses; // chainId => DEX address on that chain
+    
     // Concentrated liquidity parameters
     struct Tick {
         uint256 liquidityNet;
@@ -29,6 +37,17 @@ contract TorqueDEX {
         uint256 amount1;
     }
 
+    // Cross-chain liquidity request
+    struct CrossChainLiquidityRequest {
+        address user;
+        uint256 amount0;
+        uint256 amount1;
+        int256 lowerTick;
+        int256 upperTick;
+        uint16 sourceChainId;
+        bool isAdd; // true for add, false for remove
+    }
+
     // Stable pair parameters
     uint256 public constant A = 1000; // Amplification coefficient
     uint256 public constant PRECISION = 1e18;
@@ -39,11 +58,41 @@ contract TorqueDEX {
     int256 public currentTick;
     uint256 public currentSqrtPriceX96;
 
+    // Events
     event LiquidityAdded(address indexed user, uint256 accountId, uint256 amount0, uint256 amount1, uint256 liquidity);
     event LiquidityRemoved(address indexed user, uint256 accountId, uint256 liquidity, uint256 amount0, uint256 amount1);
     event SwapExecuted(address indexed user, uint256 accountId, address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut);
     event RangeAdded(address indexed user, uint256 accountId, int256 lowerTick, int256 upperTick, uint256 liquidity);
     event RangeRemoved(address indexed user, uint256 accountId, int256 lowerTick, int256 upperTick, uint256 liquidity);
+    
+    // Cross-chain events
+    event CrossChainLiquidityRequested(
+        address indexed user,
+        uint16 indexed dstChainId,
+        uint256 amount0,
+        uint256 amount1,
+        int256 lowerTick,
+        int256 upperTick,
+        bool isAdd
+    );
+    event CrossChainLiquidityCompleted(
+        address indexed user,
+        uint16 indexed srcChainId,
+        uint256 liquidity,
+        uint256 amount0,
+        uint256 amount1,
+        bool isAdd
+    );
+    event CrossChainLiquidityFailed(
+        address indexed user,
+        uint16 indexed srcChainId,
+        string reason
+    );
+
+    // Errors
+    error TorqueDEX__UnsupportedChain();
+    error TorqueDEX__InvalidDEXAddress();
+    error TorqueDEX__CrossChainLiquidityFailed();
 
     constructor(
         address _token0,
@@ -51,8 +100,10 @@ contract TorqueDEX {
         string memory _name,
         string memory _symbol,
         address _feeRecipient,
-        bool _isStablePair
-    ) {
+        bool _isStablePair,
+        address _lzEndpoint,
+        address _owner
+    ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
         token0 = IERC20(_token0);
         token1 = IERC20(_token1);
         feeRecipient = _feeRecipient;
@@ -61,6 +112,282 @@ contract TorqueDEX {
         // Deploy LP token
         lpToken = new TorqueLP(_name, _symbol);
         lpToken.setDEX(address(this));
+        
+        // Initialize supported chains (same as TorqueBatchMinter)
+        _initializeSupportedChains();
+    }
+
+    function _initializeSupportedChains() internal {
+        supportedChainIds[1] = true;      // Ethereum
+        supportedChainIds[42161] = true;  // Arbitrum
+        supportedChainIds[10] = true;     // Optimism
+        supportedChainIds[137] = true;    // Polygon
+        supportedChainIds[8453] = true;   // Base
+        supportedChainIds[146] = true;    // Sonic
+        supportedChainIds[2741] = true;   // Abstract
+        supportedChainIds[56] = true;     // BSC
+        supportedChainIds[999] = true;    // HyperEVM
+        supportedChainIds[252] = true;    // Fraxtal
+        supportedChainIds[43114] = true;  // Avalanche
+    }
+
+    /**
+     * @dev Add liquidity to multiple chains in a single transaction
+     */
+    function addCrossChainLiquidity(
+        uint16[] calldata dstChainIds,
+        uint256[] calldata amounts0,
+        uint256[] calldata amounts1,
+        int256[] calldata lowerTicks,
+        int256[] calldata upperTicks,
+        bytes[] calldata adapterParams
+    ) external nonReentrant {
+        require(
+            dstChainIds.length == amounts0.length &&
+            dstChainIds.length == amounts1.length &&
+            dstChainIds.length == lowerTicks.length &&
+            dstChainIds.length == upperTicks.length &&
+            dstChainIds.length == adapterParams.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            if (!supportedChainIds[dstChainIds[i]]) {
+                revert TorqueDEX__UnsupportedChain();
+            }
+
+            // Transfer tokens to this contract first
+            token0.transferFrom(msg.sender, address(this), amounts0[i]);
+            token1.transferFrom(msg.sender, address(this), amounts1[i]);
+
+            // Send cross-chain liquidity request
+            _sendCrossChainLiquidityRequest(
+                dstChainIds[i],
+                msg.sender,
+                amounts0[i],
+                amounts1[i],
+                lowerTicks[i],
+                upperTicks[i],
+                true, // isAdd
+                adapterParams[i]
+            );
+
+            emit CrossChainLiquidityRequested(
+                msg.sender,
+                dstChainIds[i],
+                amounts0[i],
+                amounts1[i],
+                lowerTicks[i],
+                upperTicks[i],
+                true
+            );
+        }
+    }
+
+    /**
+     * @dev Remove liquidity from multiple chains
+     */
+    function removeCrossChainLiquidity(
+        uint16[] calldata dstChainIds,
+        uint256[] calldata liquidityAmounts,
+        bytes[] calldata adapterParams
+    ) external nonReentrant {
+        require(
+            dstChainIds.length == liquidityAmounts.length &&
+            dstChainIds.length == adapterParams.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            if (!supportedChainIds[dstChainIds[i]]) {
+                revert TorqueDEX__UnsupportedChain();
+            }
+
+            // Send cross-chain liquidity removal request
+            _sendCrossChainLiquidityRequest(
+                dstChainIds[i],
+                msg.sender,
+                0, // amount0 (not used for removal)
+                0, // amount1 (not used for removal)
+                0, // lowerTick (not used for removal)
+                0, // upperTick (not used for removal)
+                false, // isAdd
+                adapterParams[i]
+            );
+
+            emit CrossChainLiquidityRequested(
+                msg.sender,
+                dstChainIds[i],
+                0,
+                0,
+                0,
+                0,
+                false
+            );
+        }
+    }
+
+    /**
+     * @dev Handle incoming cross-chain liquidity requests
+     */
+    function _nonblockingLzReceive(
+        uint16 srcChainId,
+        bytes memory srcAddress,
+        uint64 nonce,
+        bytes memory payload
+    ) internal override {
+        CrossChainLiquidityRequest memory request = abi.decode(
+            payload,
+            (CrossChainLiquidityRequest)
+        );
+
+        try this._processCrossChainLiquidity(request) {
+            emit CrossChainLiquidityCompleted(
+                request.user,
+                srcChainId,
+                request.isAdd ? totalLiquidity : 0,
+                request.amount0,
+                request.amount1,
+                request.isAdd
+            );
+        } catch Error(string memory reason) {
+            emit CrossChainLiquidityFailed(request.user, srcChainId, reason);
+        } catch {
+            emit CrossChainLiquidityFailed(request.user, srcChainId, "Unknown error");
+        }
+    }
+
+    /**
+     * @dev Process cross-chain liquidity request (external for try-catch)
+     */
+    function _processCrossChainLiquidity(CrossChainLiquidityRequest memory request) external {
+        require(msg.sender == address(this), "Only self");
+
+        if (request.isAdd) {
+            // Add liquidity
+            uint256 liquidity = _addLiquidityInternal(
+                request.amount0,
+                request.amount1,
+                request.lowerTick,
+                request.upperTick,
+                request.user
+            );
+            crossChainLiquidity[request.sourceChainId][request.user] += liquidity;
+        } else {
+            // Remove liquidity
+            uint256 liquidityToRemove = crossChainLiquidity[request.sourceChainId][request.user];
+            require(liquidityToRemove > 0, "No cross-chain liquidity to remove");
+            
+            (uint256 amount0, uint256 amount1) = _removeLiquidityInternal(
+                liquidityToRemove,
+                request.user
+            );
+            crossChainLiquidity[request.sourceChainId][request.user] = 0;
+        }
+    }
+
+    /**
+     * @dev Send cross-chain liquidity request
+     */
+    function _sendCrossChainLiquidityRequest(
+        uint16 dstChainId,
+        address user,
+        uint256 amount0,
+        uint256 amount1,
+        int256 lowerTick,
+        int256 upperTick,
+        bool isAdd,
+        bytes calldata adapterParams
+    ) internal {
+        address dstDEX = dexAddresses[dstChainId];
+        if (dstDEX == address(0)) {
+            revert TorqueDEX__InvalidDEXAddress();
+        }
+
+        CrossChainLiquidityRequest memory request = CrossChainLiquidityRequest({
+            user: user,
+            amount0: amount0,
+            amount1: amount1,
+            lowerTick: lowerTick,
+            upperTick: upperTick,
+            sourceChainId: uint16(block.chainid),
+            isAdd: isAdd
+        });
+
+        bytes memory payload = abi.encode(request);
+
+        _lzSend(
+            dstChainId,
+            payload,
+            payable(msg.sender),
+            address(0),
+            adapterParams
+        );
+    }
+
+    /**
+     * @dev Internal function to add liquidity
+     */
+    function _addLiquidityInternal(
+        uint256 amount0,
+        uint256 amount1,
+        int256 lowerTick,
+        int256 upperTick,
+        address user
+    ) internal returns (uint256 liquidity) {
+        require(amount0 > 0 && amount1 > 0, "Zero amounts");
+        require(lowerTick < upperTick, "Invalid range");
+
+        if (isStablePair) {
+            liquidity = _addStableLiquidity(amount0, amount1);
+        } else {
+            liquidity = _addConcentratedLiquidity(amount0, amount1, lowerTick, upperTick);
+        }
+
+        require(liquidity > 0, "Insufficient liquidity minted");
+        totalLiquidity += liquidity;
+
+        // Store range information for the user
+        userRanges[user][0].push(Range({
+            lowerTick: lowerTick,
+            upperTick: upperTick,
+            liquidity: liquidity,
+            amount0: amount0,
+            amount1: amount1
+        }));
+
+        // Mint LP tokens
+        lpToken.mint(user, liquidity);
+
+        emit LiquidityAdded(user, 0, amount0, amount1, liquidity);
+        emit RangeAdded(user, 0, lowerTick, upperTick, liquidity);
+    }
+
+    /**
+     * @dev Internal function to remove liquidity
+     */
+    function _removeLiquidityInternal(
+        uint256 liquidity,
+        address user
+    ) internal returns (uint256 amount0, uint256 amount1) {
+        require(liquidity > 0, "Zero liquidity");
+
+        Range[] storage ranges = userRanges[user][0];
+        require(ranges.length > 0, "No ranges found");
+        
+        Range storage range = ranges[ranges.length - 1];
+        amount0 = range.amount0;
+        amount1 = range.amount1;
+
+        totalLiquidity -= liquidity;
+        ranges.pop();
+
+        lpToken.burn(user, liquidity);
+        token0.transfer(user, amount0);
+        token1.transfer(user, amount1);
+
+        emit LiquidityRemoved(user, 0, liquidity, amount0, amount1);
+        emit RangeRemoved(user, 0, range.lowerTick, range.upperTick, liquidity);
     }
 
     function addLiquidity(
@@ -299,13 +626,110 @@ contract TorqueDEX {
         emit SwapExecuted(msg.sender, 0, address(inToken), amountIn, address(outToken), amountOut);
     }
 
-    function setFee(uint256 _feeBps) external {
+    function setFee(uint256 _feeBps) external onlyOwner {
         // CHECKS
-        require(msg.sender == feeRecipient, "Not authorized");
         require(_feeBps <= 30, "Max 0.3%");
         
         // EFFECTS
         feeBps = _feeBps;
+    }
+
+    /**
+     * @dev Set fee recipient address
+     */
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        require(_feeRecipient != address(0), "Invalid fee recipient");
+        feeRecipient = _feeRecipient;
+    }
+
+    // Cross-chain admin functions
+
+    /**
+     * @dev Set DEX address for a specific chain
+     */
+    function setDEXAddress(uint16 chainId, address dexAddress) external onlyOwner {
+        require(supportedChainIds[chainId], "Unsupported chain");
+        require(dexAddress != address(0), "Invalid address");
+        dexAddresses[chainId] = dexAddress;
+    }
+
+    /**
+     * @dev Get cross-chain liquidity for a user on a specific chain
+     */
+    function getCrossChainLiquidity(address user, uint16 chainId) external view returns (uint256) {
+        return crossChainLiquidity[chainId][user];
+    }
+
+    /**
+     * @dev Get total cross-chain liquidity across all chains for a user
+     */
+    function getTotalCrossChainLiquidity(address user) external view returns (uint256 total) {
+        uint16[] memory chainIds = _getSupportedChainIds();
+        for (uint256 i = 0; i < chainIds.length; i++) {
+            total += crossChainLiquidity[chainIds[i]][user];
+        }
+    }
+
+    /**
+     * @dev Get all supported chain IDs
+     */
+    function _getSupportedChainIds() internal view returns (uint16[] memory) {
+        uint16[] memory chainIds = new uint16[](11);
+        chainIds[0] = 1;      // Ethereum
+        chainIds[1] = 42161;  // Arbitrum
+        chainIds[2] = 10;     // Optimism
+        chainIds[3] = 137;    // Polygon
+        chainIds[4] = 8453;   // Base
+        chainIds[5] = 146;    // Sonic
+        chainIds[6] = 2741;   // Abstract
+        chainIds[7] = 56;     // BSC
+        chainIds[8] = 999;    // HyperEVM
+        chainIds[9] = 252;    // Fraxtal
+        chainIds[10] = 43114; // Avalanche
+        return chainIds;
+    }
+
+    /**
+     * @dev Emergency function to recover stuck tokens
+     */
+    function emergencyWithdraw(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        IERC20(token).transfer(to, amount);
+    }
+
+    /**
+     * @dev Get cross-chain liquidity quote (gas estimation)
+     */
+    function getCrossChainLiquidityQuote(
+        uint16[] calldata dstChainIds,
+        bytes[] calldata adapterParams
+    ) external view returns (uint256 totalGasEstimate) {
+        require(dstChainIds.length == adapterParams.length, "Array length mismatch");
+        
+        totalGasEstimate = 0;
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            // Estimate gas for each cross-chain message
+            uint256 messageGas = _estimateGasForMessage(dstChainIds[i], adapterParams[i]);
+            totalGasEstimate += messageGas;
+        }
+        
+        // Add base transaction gas
+        totalGasEstimate += 21000;
+    }
+
+    /**
+     * @dev Estimate gas for a single cross-chain message
+     */
+    function _estimateGasForMessage(
+        uint16 dstChainId,
+        bytes calldata adapterParams
+    ) internal view returns (uint256) {
+        // This would integrate with LayerZero's gas estimation
+        // For now, return a conservative estimate
+        return 100000; // Conservative estimate per message
     }
 
     function sqrt(uint256 y) internal pure returns (uint256 z) {
@@ -323,5 +747,9 @@ contract TorqueDEX {
 
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
+    }
+
+    function totalSupply() public view returns (uint256) {
+        return lpToken.totalSupply();
     }
 }
