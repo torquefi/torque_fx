@@ -49,7 +49,7 @@ async function main() {
   const torqueDEX = await TorqueDEX.deploy(
     mockToken0.address,
     mockToken1.address,
-    "Torque LP Token",
+    "Torque LP",
     "TLP",
     deployer.address, // fee recipient
     false, // isStablePair

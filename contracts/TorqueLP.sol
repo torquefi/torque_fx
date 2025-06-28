@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
 
-contract TorqueLP is ERC20, Ownable {
+contract TorqueLP is OFT {
     address public dex;
 
     event DEXUpdated(address indexed oldDex, address indexed newDex);
 
-    constructor() ERC20("Torque LP", "TLP") Ownable(msg.sender) {}
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _lzEndpoint,
+        address _owner
+    ) OFT(_name, _symbol, _lzEndpoint, _owner) {}
 
     function setDEX(address _dex) external onlyOwner {
         require(_dex != address(0), "Invalid DEX address");

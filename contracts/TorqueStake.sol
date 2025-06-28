@@ -5,14 +5,31 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 
-contract TorqueStake is Ownable, ReentrancyGuard {
+contract TorqueStake is OApp, Ownable, ReentrancyGuard {
     using Math for uint256;
 
     IERC20 public lpToken;
     IERC20 public torqToken;
     IERC20 public rewardToken;
     address public treasuryFeeRecipient;
+
+    // Cross-chain staking parameters
+    mapping(uint16 => bool) public supportedChainIds;
+    mapping(uint16 => address) public stakeAddresses; // chainId => stake contract address
+    mapping(uint16 => mapping(address => uint256)) public crossChainStakes; // chainId => user => total staked
+    mapping(address => uint256) public totalCrossChainStakes; // user => total staked across all chains
+
+    // Cross-chain stake request
+    struct CrossChainStakeRequest {
+        address user;
+        uint256 amount;
+        uint256 lockDuration;
+        bool isLp; // true for LP, false for TORQ
+        uint16 sourceChainId;
+        bool isStake; // true for stake, false for unstake
+    }
 
     // Staking parameters
     uint256 public constant MIN_LOCK_DURATION = 7 days;
@@ -41,30 +58,428 @@ contract TorqueStake is Ownable, ReentrancyGuard {
     // Reward parameters
     uint256 public lastUpdateTime;
 
+    // Events
     event Staked(address indexed user, uint256 amount, uint256 lockDuration, bool isLp);
     event Unstaked(address indexed user, uint256 amount, bool isLp, bool isEarly);
     event RewardPaid(address indexed user, uint256 reward, bool isLp);
     event VotePowerUpdated(address indexed user, uint256 newPower);
     event TreasuryFeeRecipientUpdated(address indexed newRecipient);
     event EarlyExitPenaltyPaid(address indexed user, uint256 amount, bool isLp);
+    
+    // Cross-chain events
+    event CrossChainStakeRequested(
+        address indexed user,
+        uint16 indexed dstChainId,
+        uint256 amount,
+        uint256 lockDuration,
+        bool isLp,
+        bool isStake
+    );
+    event CrossChainStakeCompleted(
+        address indexed user,
+        uint16 indexed srcChainId,
+        uint256 amount,
+        bool isLp,
+        bool isStake
+    );
+    event CrossChainStakeFailed(
+        address indexed user,
+        uint16 indexed srcChainId,
+        string reason
+    );
+
+    // Errors
+    error TorqueStake__UnsupportedChain();
+    error TorqueStake__InvalidStakeAddress();
+    error TorqueStake__CrossChainStakeFailed();
 
     constructor(
         address _lpToken,
         address _torqToken,
         address _rewardToken,
-        address _treasuryFeeRecipient
-    ) {
+        address _treasuryFeeRecipient,
+        address _lzEndpoint,
+        address _owner
+    ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
         lpToken = IERC20(_lpToken);
         torqToken = IERC20(_torqToken);
         rewardToken = IERC20(_rewardToken);
         treasuryFeeRecipient = _treasuryFeeRecipient;
         lastUpdateTime = block.timestamp;
+        
+        // Initialize supported chains
+        _initializeSupportedChains();
+    }
+
+    function _initializeSupportedChains() internal {
+        supportedChainIds[1] = true;      // Ethereum
+        supportedChainIds[42161] = true;  // Arbitrum
+        supportedChainIds[10] = true;     // Optimism
+        supportedChainIds[137] = true;    // Polygon
+        supportedChainIds[8453] = true;   // Base
+        supportedChainIds[146] = true;    // Sonic
+        supportedChainIds[2741] = true;   // Abstract
+        supportedChainIds[56] = true;     // BSC
+        supportedChainIds[999] = true;    // HyperEVM
+        supportedChainIds[252] = true;    // Fraxtal
+        supportedChainIds[43114] = true;  // Avalanche
+    }
+
+    /**
+     * @dev Stake tokens on multiple chains simultaneously
+     */
+    function stakeCrossChain(
+        uint16[] calldata dstChainIds,
+        uint256[] calldata amounts,
+        uint256[] calldata lockDurations,
+        bool[] calldata isLp,
+        bytes[] calldata adapterParams
+    ) external nonReentrant {
+        require(
+            dstChainIds.length == amounts.length &&
+            dstChainIds.length == lockDurations.length &&
+            dstChainIds.length == isLp.length &&
+            dstChainIds.length == adapterParams.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            if (!supportedChainIds[dstChainIds[i]]) {
+                revert TorqueStake__UnsupportedChain();
+            }
+
+            // Transfer tokens to this contract first
+            if (isLp[i]) {
+                lpToken.transferFrom(msg.sender, address(this), amounts[i]);
+            } else {
+                torqToken.transferFrom(msg.sender, address(this), amounts[i]);
+            }
+
+            // Send cross-chain stake request
+            _sendCrossChainStakeRequest(
+                dstChainIds[i],
+                msg.sender,
+                amounts[i],
+                lockDurations[i],
+                isLp[i],
+                true, // isStake
+                adapterParams[i]
+            );
+
+            emit CrossChainStakeRequested(
+                msg.sender,
+                dstChainIds[i],
+                amounts[i],
+                lockDurations[i],
+                isLp[i],
+                true
+            );
+        }
+    }
+
+    /**
+     * @dev Unstake tokens from multiple chains
+     */
+    function unstakeCrossChain(
+        uint16[] calldata dstChainIds,
+        bytes[] calldata adapterParams
+    ) external nonReentrant {
+        require(
+            dstChainIds.length == adapterParams.length,
+            "Array length mismatch"
+        );
+
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            if (!supportedChainIds[dstChainIds[i]]) {
+                revert TorqueStake__UnsupportedChain();
+            }
+
+            // Send cross-chain unstake request
+            _sendCrossChainStakeRequest(
+                dstChainIds[i],
+                msg.sender,
+                0, // amount (not used for unstake)
+                0, // lockDuration (not used for unstake)
+                false, // isLp (not used for unstake)
+                false, // isStake
+                adapterParams[i]
+            );
+
+            emit CrossChainStakeRequested(
+                msg.sender,
+                dstChainIds[i],
+                0,
+                0,
+                false,
+                false
+            );
+        }
+    }
+
+    /**
+     * @dev Handle incoming cross-chain stake requests
+     */
+    function _nonblockingLzReceive(
+        uint16 srcChainId,
+        bytes memory srcAddress,
+        uint64 nonce,
+        bytes memory payload
+    ) internal override {
+        CrossChainStakeRequest memory request = abi.decode(
+            payload,
+            (CrossChainStakeRequest)
+        );
+
+        try this._processCrossChainStake(request) {
+            emit CrossChainStakeCompleted(
+                request.user,
+                srcChainId,
+                request.amount,
+                request.isLp,
+                request.isStake
+            );
+        } catch Error(string memory reason) {
+            emit CrossChainStakeFailed(request.user, srcChainId, reason);
+        } catch {
+            emit CrossChainStakeFailed(request.user, srcChainId, "Unknown error");
+        }
+    }
+
+    /**
+     * @dev Process cross-chain stake request (external for try-catch)
+     */
+    function _processCrossChainStake(CrossChainStakeRequest memory request) external {
+        require(msg.sender == address(this), "Only self");
+
+        if (request.isStake) {
+            // Stake tokens
+            if (request.isLp) {
+                _stakeLpInternal(request.user, request.amount, request.lockDuration);
+                crossChainStakes[request.sourceChainId][request.user] += request.amount;
+            } else {
+                _stakeTorqInternal(request.user, request.amount, request.lockDuration);
+                crossChainStakes[request.sourceChainId][request.user] += request.amount;
+            }
+            totalCrossChainStakes[request.user] += request.amount;
+        } else {
+            // Unstake tokens
+            uint256 stakedAmount = crossChainStakes[request.sourceChainId][request.user];
+            require(stakedAmount > 0, "No cross-chain stake to unstake");
+
+            if (request.isLp) {
+                _unstakeLpInternal(request.user);
+            } else {
+                _unstakeTorqInternal(request.user);
+            }
+
+            crossChainStakes[request.sourceChainId][request.user] = 0;
+            totalCrossChainStakes[request.user] -= stakedAmount;
+        }
+    }
+
+    /**
+     * @dev Send cross-chain stake request
+     */
+    function _sendCrossChainStakeRequest(
+        uint16 dstChainId,
+        address user,
+        uint256 amount,
+        uint256 lockDuration,
+        bool isLp,
+        bool isStake,
+        bytes calldata adapterParams
+    ) internal {
+        address dstStake = stakeAddresses[dstChainId];
+        if (dstStake == address(0)) {
+            revert TorqueStake__InvalidStakeAddress();
+        }
+
+        CrossChainStakeRequest memory request = CrossChainStakeRequest({
+            user: user,
+            amount: amount,
+            lockDuration: lockDuration,
+            isLp: isLp,
+            sourceChainId: uint16(block.chainid),
+            isStake: isStake
+        });
+
+        bytes memory payload = abi.encode(request);
+
+        _lzSend(
+            dstChainId,
+            payload,
+            payable(msg.sender),
+            address(0),
+            adapterParams
+        );
     }
 
     function setTreasuryFeeRecipient(address _treasuryFeeRecipient) external onlyOwner {
         require(_treasuryFeeRecipient != address(0), "Invalid treasury address");
         treasuryFeeRecipient = _treasuryFeeRecipient;
         emit TreasuryFeeRecipientUpdated(_treasuryFeeRecipient);
+    }
+
+    /**
+     * @dev Set stake contract address for a specific chain
+     */
+    function setStakeAddress(uint16 chainId, address stakeAddress) external onlyOwner {
+        require(supportedChainIds[chainId], "Unsupported chain");
+        require(stakeAddress != address(0), "Invalid stake address");
+        stakeAddresses[chainId] = stakeAddress;
+    }
+
+    /**
+     * @dev Get cross-chain stake info for a user
+     */
+    function getCrossChainStakeInfo(address user, uint16 chainId) external view returns (uint256) {
+        return crossChainStakes[chainId][user];
+    }
+
+    /**
+     * @dev Get total cross-chain stakes for a user across all chains
+     */
+    function getTotalCrossChainStakes(address user) external view returns (uint256) {
+        return totalCrossChainStakes[user];
+    }
+
+    /**
+     * @dev Get cross-chain stake quote (gas estimation)
+     */
+    function getCrossChainStakeQuote(
+        uint16[] calldata dstChainIds,
+        bytes[] calldata adapterParams
+    ) external view returns (uint256 totalGasEstimate) {
+        require(dstChainIds.length == adapterParams.length, "Array length mismatch");
+        
+        totalGasEstimate = 0;
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            uint256 messageGas = _estimateGasForMessage(dstChainIds[i], adapterParams[i]);
+            totalGasEstimate += messageGas;
+        }
+        
+        totalGasEstimate += 21000; // Base transaction cost
+    }
+
+    /**
+     * @dev Estimate gas for a single cross-chain message
+     */
+    function _estimateGasForMessage(
+        uint16 dstChainId,
+        bytes calldata adapterParams
+    ) internal view returns (uint256) {
+        // Conservative estimate per message
+        return 100000;
+    }
+
+    /**
+     * @dev Internal function to stake LP tokens
+     */
+    function _stakeLpInternal(address user, uint256 amount, uint256 lockDuration) internal {
+        require(amount > 0, "Cannot stake 0");
+        require(lockDuration >= MIN_LOCK_DURATION, "Lock too short");
+        require(lockDuration <= MAX_LOCK_DURATION, "Lock too long");
+
+        Stake storage stake = lpStakes[user];
+        if (stake.amount > 0) {
+            _updateRewards(user, true);
+        }
+
+        stake.amount += amount;
+        stake.lockEnd = block.timestamp + lockDuration;
+        stake.lastRewardTime = block.timestamp;
+        stake.lockDuration = lockDuration;
+
+        _updateVotePower(user);
+        emit Staked(user, amount, lockDuration, true);
+    }
+
+    /**
+     * @dev Internal function to stake TORQ tokens
+     */
+    function _stakeTorqInternal(address user, uint256 amount, uint256 lockDuration) internal {
+        require(amount > 0, "Cannot stake 0");
+        require(lockDuration >= MIN_LOCK_DURATION, "Lock too short");
+        require(lockDuration <= MAX_LOCK_DURATION, "Lock too long");
+
+        Stake storage stake = torqStakes[user];
+        if (stake.amount > 0) {
+            _updateRewards(user, false);
+        }
+
+        stake.amount += amount;
+        stake.lockEnd = block.timestamp + lockDuration;
+        stake.lastRewardTime = block.timestamp;
+        stake.lockDuration = lockDuration;
+
+        _updateVotePower(user);
+        emit Staked(user, amount, lockDuration, false);
+    }
+
+    /**
+     * @dev Internal function to unstake LP tokens
+     */
+    function _unstakeLpInternal(address user) internal {
+        Stake storage stake = lpStakes[user];
+        require(stake.amount > 0, "No stake");
+
+        _updateRewards(user, true);
+        uint256 amount = stake.amount;
+        bool isEarly = block.timestamp < stake.lockEnd;
+        uint256 penalty = 0;
+
+        if (isEarly) {
+            penalty = (amount * EARLY_EXIT_PENALTY) / 10000;
+            amount -= penalty;
+        }
+
+        stake.amount = 0;
+        stake.lockEnd = 0;
+        stake.lastRewardTime = 0;
+        stake.lockDuration = 0;
+
+        _updateVotePower(user);
+
+        if (penalty > 0) {
+            lpToken.transfer(treasuryFeeRecipient, penalty);
+            emit EarlyExitPenaltyPaid(user, penalty, true);
+        }
+        lpToken.transfer(user, amount);
+
+        emit Unstaked(user, amount, true, isEarly);
+    }
+
+    /**
+     * @dev Internal function to unstake TORQ tokens
+     */
+    function _unstakeTorqInternal(address user) internal {
+        Stake storage stake = torqStakes[user];
+        require(stake.amount > 0, "No stake");
+
+        _updateRewards(user, false);
+        uint256 amount = stake.amount;
+        bool isEarly = block.timestamp < stake.lockEnd;
+        uint256 penalty = 0;
+
+        if (isEarly) {
+            penalty = (amount * EARLY_EXIT_PENALTY) / 10000;
+            amount -= penalty;
+        }
+
+        stake.amount = 0;
+        stake.lockEnd = 0;
+        stake.lastRewardTime = 0;
+        stake.lockDuration = 0;
+
+        _updateVotePower(user);
+
+        if (penalty > 0) {
+            torqToken.transfer(treasuryFeeRecipient, penalty);
+            emit EarlyExitPenaltyPaid(user, penalty, false);
+        }
+        torqToken.transfer(user, amount);
+
+        emit Unstaked(user, amount, false, isEarly);
     }
 
     function stakeLp(uint256 amount, uint256 lockDuration) external nonReentrant {
@@ -287,5 +702,16 @@ contract TorqueStake is Ownable, ReentrancyGuard {
         torqApr = _calculateAPR(torqStake.lockDuration);
 
         userVotePower = votePower[user];
+    }
+
+    /**
+     * @dev Emergency function to recover stuck tokens
+     */
+    function emergencyWithdraw(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        IERC20(token).transfer(to, amount);
     }
 } 

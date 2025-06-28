@@ -109,8 +109,8 @@ contract TorqueDEX is OApp, Ownable, ReentrancyGuard {
         feeRecipient = _feeRecipient;
         isStablePair = _isStablePair;
         
-        // Deploy LP token
-        lpToken = new TorqueLP(_name, _symbol);
+        // Deploy LP token as OFT
+        lpToken = new TorqueLP(_name, _symbol, _lzEndpoint, _owner);
         lpToken.setDEX(address(this));
         
         // Initialize supported chains (same as TorqueBatchMinter)
