@@ -9,10 +9,7 @@ contract TorqueLP is ERC20, Ownable {
 
     event DEXUpdated(address indexed oldDex, address indexed newDex);
 
-    constructor(
-        string memory name,
-        string memory symbol
-    ) ERC20(name, symbol) Ownable(msg.sender) {}
+    constructor() ERC20("Torque LP", "TLP") Ownable(msg.sender) {}
 
     function setDEX(address _dex) external onlyOwner {
         require(_dex != address(0), "Invalid DEX address");
@@ -30,4 +27,4 @@ contract TorqueLP is ERC20, Ownable {
         require(msg.sender == dex, "Only DEX can burn");
         _burn(from, amount);
     }
-} 
+}

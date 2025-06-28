@@ -2,26 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./4337/TorqueAccount.sol";
 import "./TorqueLP.sol";
-
-interface ITorqueAccount {
-    function userAccounts(address user, uint256 accountId) external view returns (
-        uint256 leverage,
-        bool exists,
-        bool active,
-        string memory username,
-        address referrer
-    );
-    function isValidAccount(address user, uint256 accountId) external view returns (bool);
-}
 
 contract TorqueDEX {
     IERC20 public token0;
     IERC20 public token1;
     TorqueLP public lpToken;
-
-    ITorqueAccount public torqueAccount;
 
     uint256 public totalLiquidity;
     uint256 public feeBps = 4;
@@ -65,13 +51,11 @@ contract TorqueDEX {
         string memory _name,
         string memory _symbol,
         address _feeRecipient,
-        address _torqueAccount,
         bool _isStablePair
     ) {
         token0 = IERC20(_token0);
         token1 = IERC20(_token1);
         feeRecipient = _feeRecipient;
-        torqueAccount = ITorqueAccount(_torqueAccount);
         isStablePair = _isStablePair;
         
         // Deploy LP token
@@ -82,12 +66,10 @@ contract TorqueDEX {
     function addLiquidity(
         uint256 amount0,
         uint256 amount1,
-        uint256 accountId,
         int256 lowerTick,
         int256 upperTick
     ) external returns (uint256 liquidity) {
         // CHECKS
-        require(isValidAccount(msg.sender, accountId), "Invalid account");
         require(amount0 > 0 && amount1 > 0, "Zero amounts");
         require(lowerTick < upperTick, "Invalid range");
 
@@ -101,8 +83,8 @@ contract TorqueDEX {
         require(liquidity > 0, "Insufficient liquidity minted");
         totalLiquidity += liquidity;
 
-        // Store range information
-        userRanges[msg.sender][accountId].push(Range({
+        // Store range information for the user
+        userRanges[msg.sender][0].push(Range({
             lowerTick: lowerTick,
             upperTick: upperTick,
             liquidity: liquidity,
@@ -115,8 +97,8 @@ contract TorqueDEX {
         token1.transferFrom(msg.sender, address(this), amount1);
         lpToken.mint(msg.sender, liquidity);
 
-        emit LiquidityAdded(msg.sender, accountId, amount0, amount1, liquidity);
-        emit RangeAdded(msg.sender, accountId, lowerTick, upperTick, liquidity);
+        emit LiquidityAdded(msg.sender, 0, amount0, amount1, liquidity);
+        emit RangeAdded(msg.sender, 0, lowerTick, upperTick, liquidity);
     }
 
     function _addStableLiquidity(uint256 amount0, uint256 amount1) internal returns (uint256) {
@@ -232,13 +214,12 @@ contract TorqueDEX {
         }
     }
 
-    function removeLiquidity(uint256 liquidity, uint256 accountId) external returns (uint256 amount0, uint256 amount1) {
+    function removeLiquidity(uint256 liquidity) external returns (uint256 amount0, uint256 amount1) {
         // CHECKS
-        require(isValidAccount(msg.sender, accountId), "Invalid account");
         require(liquidity > 0, "Zero liquidity");
 
         // Find the range to remove
-        Range[] storage ranges = userRanges[msg.sender][accountId];
+        Range[] storage ranges = userRanges[msg.sender][0];
         require(ranges.length > 0, "No ranges found");
         
         Range storage range = ranges[ranges.length - 1];
@@ -254,8 +235,8 @@ contract TorqueDEX {
         token0.transfer(msg.sender, amount0);
         token1.transfer(msg.sender, amount1);
 
-        emit LiquidityRemoved(msg.sender, accountId, liquidity, amount0, amount1);
-        emit RangeRemoved(msg.sender, accountId, range.lowerTick, range.upperTick, liquidity);
+        emit LiquidityRemoved(msg.sender, 0, liquidity, amount0, amount1);
+        emit RangeRemoved(msg.sender, 0, range.lowerTick, range.upperTick, liquidity);
     }
 
     function getAmountOut(
@@ -287,11 +268,9 @@ contract TorqueDEX {
 
     function swap(
         address tokenIn,
-        uint256 amountIn,
-        uint256 accountId
+        uint256 amountIn
     ) external returns (uint256 amountOut) {
         // CHECKS
-        require(isValidAccount(msg.sender, accountId), "Invalid account");
         require(amountIn > 0, "Invalid input");
         require(tokenIn == address(token0) || tokenIn == address(token1), "Invalid token");
 
@@ -317,7 +296,7 @@ contract TorqueDEX {
             inToken.transfer(feeRecipient, fee);
         }
 
-        emit SwapExecuted(msg.sender, accountId, address(inToken), amountIn, address(outToken), amountOut);
+        emit SwapExecuted(msg.sender, 0, address(inToken), amountIn, address(outToken), amountOut);
     }
 
     function setFee(uint256 _feeBps) external {
@@ -327,11 +306,6 @@ contract TorqueDEX {
         
         // EFFECTS
         feeBps = _feeBps;
-    }
-
-    function isValidAccount(address user, uint256 accountId) public view returns (bool) {
-        (, bool exists, bool active, , ) = torqueAccount.userAccounts(user, accountId);
-        return exists && active;
     }
 
     function sqrt(uint256 y) internal pure returns (uint256 z) {
