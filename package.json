@@ -11,6 +11,13 @@
   "description": "",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.24.3"
+    "@types/node": "^24.0.6",
+    "hardhat": "^2.24.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@layerzerolabs/lz-evm-oapp-v2": "^3.0.107",
+    "@layerzerolabs/oft-evm": "^3.1.4"
   }
 }

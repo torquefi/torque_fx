@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { OFTCore } from "@layerzerolabs/oft-evm/contracts/OFTCore.sol";
+import { OFTCore } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFTCore.sol";
 
 contract TorqueCHF is ERC20, OFTCore {
     constructor(
