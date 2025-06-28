@@ -15,17 +15,17 @@ This guide covers the deployment of Torque across multiple chains, including the
 2. **Environment Variables**
    ```env
    PRIVATE_KEY=your_private_key_here
-   ETHEREUM_RPC_URL=https://eth-mainnet.alchemyapi.io/v2/your_key
-   ARBITRUM_RPC_URL=https://arb-mainnet.g.alchemy.com/v2/your_key
-   OPTIMISM_RPC_URL=https://opt-mainnet.g.alchemy.com/v2/your_key
-   POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/your_key
-   BASE_RPC_URL=https://mainnet.base.org
-   SONIC_RPC_URL=https://mainnet.sonic.oasys.games
-   ABSTRACT_RPC_URL=https://rpc.abstract.money
-   BSC_RPC_URL=https://bsc-dataseed.binance.org
-   HYPEREVM_RPC_URL=https://rpc.hyperevm.com
-   FRAXTAL_RPC_URL=https://rpc.fraxtal.com
-   AVALANCHE_RPC_URL=https://api.avax.network/ext/bc/C/rpc
+   ETHEREUM_RPC_URL=https://eth.llamarpc.com
+   ARBITRUM_RPC_URL=https://arbitrum.drpc.org
+   OPTIMISM_RPC_URL=https://optimism.drpc.org
+   POLYGON_RPC_URL=https://polygon-rpc.com
+   BASE_RPC_URL=https://base.llamarpc.com
+   SONIC_RPC_URL=https://sonic.drpc.org
+   ABSTRACT_RPC_URL=https://api.mainnet.abs.xyz
+   BSC_RPC_URL=https://binance.llamarpc.com
+   HYPEREVM_RPC_URL=https://rpc.hypurrscan.io
+   FRAXTAL_RPC_URL=https://fraxtal.drpc.org
+   AVALANCHE_RPC_URL=https://avalanche.drpc.org
    ```
 
 ## Deployment Flow

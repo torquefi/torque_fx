@@ -27,6 +27,7 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `Torque.sol`: Native ERC20 token with voting and omnichain support
 - `TorqueDEX.sol`: Native AMM with concentrated and stable liquidity models
 - `TorqueStake.sol`: Staking contract for LP and TORQ tokens with lock periods
+- `TorqueBatchMinter.sol`: Batch minting for multiple destination chains
 - `TorqueRewards.sol`: Trading rewards distribution (referral and cashback)
 - `TorqueLP.sol`: LP token contract for DEX liquidity positions
 - `TorqueRouter.sol`: Trading pair and price feed management
@@ -82,6 +83,7 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueNZDEngine  | `0x...`          | `0x...`           |
 | TorqueXAUEngine  | `0x...`          | `0x...`           |
 | TorqueXAGEngine  | `0x...`          | `0x...`           |
+| TorqueBatchMinter | `0x...`          | `0x...`           |
 | Treasury         | `0x...`          | `0x...`           |
 
 ## Getting Started
