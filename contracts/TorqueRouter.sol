@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "./4337/TorqueAccount.sol";
 
 interface ITorqueAccount {
@@ -35,7 +35,7 @@ contract TorqueRouter is Ownable {
     event TokenAllowed(address indexed token, bool allowed);
     event PriceFeedAllowed(address indexed feed, bool allowed);
 
-    constructor(address _torqueAccount) {
+    constructor(address _torqueAccount) Ownable(msg.sender) {
         torqueAccount = ITorqueAccount(_torqueAccount);
     }
 

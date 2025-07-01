@@ -5,12 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@account-abstraction/contracts/core/BaseAccount.sol";
 import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
-import "./EntryPoint.sol";
 
 interface ITorqueDEX {
     function depositLiquidity(address token, uint256 amount) external;
@@ -70,6 +69,21 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         bool isETH;
     }
 
+    // Define UserOperation struct locally
+    struct UserOperation {
+        address sender;
+        uint256 nonce;
+        bytes initCode;
+        bytes callData;
+        uint256 callGasLimit;
+        uint256 verificationGasLimit;
+        uint256 preVerificationGas;
+        uint256 maxFeePerGas;
+        uint256 maxPriorityFeePerGas;
+        bytes paymasterAndData;
+        bytes signature;
+    }
+
     IEntryPoint private immutable _entryPoint;
     IERC20 public immutable usdc;
     ITorqueDEX public immutable torqueDEX;
@@ -94,6 +108,8 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     uint256 public constant MAX_USERNAME_LENGTH = 32;
     uint256 public constant RECOVERY_DELAY = 7 days;
     uint256 public constant RECOVERY_WINDOW = 2 days;
+    uint256 public constant SIG_VALIDATION_FAILED = 1;
+    uint256 public constant SIG_VALIDATION_SUCCESS = 0;
 
     event AccountCreated(address indexed user, uint256 accountId, uint256 leverage, string username, address referrer);
     event AccountUpdated(address indexed user, uint256 accountId, uint256 leverage);
@@ -131,13 +147,13 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     }
 
     constructor(
-        IEntryPoint entryPoint,
+        IEntryPoint entryPoint_,
         address _usdc,
         address _guardian,
         address _torqueDEX,
         address _lzEndpoint
-    ) OApp(_lzEndpoint, msg.sender) {
-        _entryPoint = entryPoint;
+    ) OApp(_lzEndpoint, msg.sender) Ownable(msg.sender) {
+        _entryPoint = entryPoint_;
         usdc = IERC20(_usdc);
         guardian = _guardian;
         torqueDEX = ITorqueDEX(_torqueDEX);
@@ -228,10 +244,9 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
         internal
         virtual
-        override
         returns (uint256 validationData)
     {
-        bytes32 hash = userOpHash.toEthSignedMessageHash();
+        bytes32 hash = keccak256(abi.encodePacked(userOpHash));
         address signer = hash.recover(userOp.signature);
         if (owner() != signer) return SIG_VALIDATION_FAILED;
         return 0;
@@ -270,13 +285,13 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     function getETHBalance(address user, uint256 accountId) external view returns (uint256) {
         Account storage account = userAccounts[user][accountId];
         require(account.exists && account.active, "Invalid account");
-        return account.ethBalance;
+        return ethBalances[user][accountId];
     }
 
     function getUSDCBalance(address user, uint256 accountId) external view returns (uint256) {
         Account storage account = userAccounts[user][accountId];
         require(account.exists && account.active, "Invalid account");
-        return account.usdcBalance;
+        return usdcBalances[user][accountId];
     }
 
     function createAccount(
@@ -355,7 +370,7 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         return account.leverage;
     }
 
-    function isValidAccount(address user, uint256 accountId) external view returns (bool) {
+    function isValidAccount(address user, uint256 accountId) public view returns (bool) {
         Account storage account = userAccounts[user][accountId];
         return account.exists && account.active;
     }
@@ -456,8 +471,8 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
 
         // Return collateral plus/minus PnL
         uint256 finalAmount = position.isLong 
-            ? returnAmount + uint256(pnl > 0 ? pnl : 0)
-            : returnAmount - uint256(pnl < 0 ? -pnl : 0);
+            ? returnAmount + uint256(pnl > 0 ? pnl : int256(0))
+            : returnAmount - uint256(pnl < 0 ? -pnl : int256(0));
 
         usdcBalances[msg.sender][accountId] += finalAmount;
 

@@ -13,7 +13,7 @@ contract TorqueLP is OFT {
         string memory _symbol,
         address _lzEndpoint,
         address _owner
-    ) OFT(_name, _symbol, _lzEndpoint, _owner) {}
+    ) OFT(_name, _symbol, _lzEndpoint, _owner) Ownable(_owner) {}
 
     function setDEX(address _dex) external onlyOwner {
         require(_dex != address(0), "Invalid DEX address");

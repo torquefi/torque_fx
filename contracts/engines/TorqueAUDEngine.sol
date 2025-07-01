@@ -3,8 +3,10 @@ pragma solidity 0.8.20;
 
 import "./TorqueEngine.sol";
 import { TorqueAUD } from "../currencies/TorqueAUD.sol";
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Origin } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/interfaces/IOAppReceiver.sol";
+import { MessagingFee } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 
 contract TorqueAUDEngine is TorqueEngine {
     IERC20 private immutable i_collateralToken;
@@ -54,27 +56,32 @@ contract TorqueAUDEngine is TorqueEngine {
         depositCollateral(amountCollateral);
 
         // INTERACTIONS
+        bytes memory message = abi.encode(amountTorqueAUDToMint, msg.sender);
+        MessagingFee memory fee = _quote(dstChainId, message, adapterParams, false);
         _lzSend(
             dstChainId,
-            abi.encode(amountTorqueAUDToMint, msg.sender),
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            message,
+            adapterParams,
+            fee,
+            payable(msg.sender)
         );
     }
 
-    function _nonblockingLzReceive(
-        uint16,
-        bytes memory,
-        uint64,
-        bytes memory _payload
-    ) internal override {
-        // CHECKS
-        require(_payload.length > 0, "Invalid payload");
-
-        // EFFECTS
-        (uint256 amountTorqueAUDToMint, address user) = abi.decode(_payload, (uint256, address));
-        _mintTorque(amountTorqueAUDToMint, user);
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) internal virtual override {
+        // Call parent implementation first
+        super._lzReceive(_origin, _guid, _message, _executor, _extraData);
+        
+        // Additional custom logic for minting TorqueAUD
+        if (_message.length > 0) {
+            (uint256 amountTorqueAUDToMint, address user) = abi.decode(_message, (uint256, address));
+            _mintTorque(amountTorqueAUDToMint, user);
+        }
     }
 
     function redeemCollateralForTorqueAUD(
@@ -94,12 +101,14 @@ contract TorqueAUDEngine is TorqueEngine {
         _redeemCollateral(amountCollateral, msg.sender, msg.sender);
 
         // INTERACTIONS
+        bytes memory message = abi.encode(amountTorqueAUDToBurn, msg.sender);
+        MessagingFee memory fee = _quote(dstChainId, message, adapterParams, false);
         _lzSend(
             dstChainId,
-            abi.encode(amountTorqueAUDToBurn, msg.sender),
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            message,
+            adapterParams,
+            fee,
+            payable(msg.sender)
         );
     }
 
@@ -128,7 +137,7 @@ contract TorqueAUDEngine is TorqueEngine {
     }
 
     function getTokenAmountFromAud(uint256 audAmountInWei) public view returns (uint256) {
-        (, int256 price,,,) = i_priceFeed.staleCheckLatestRoundData();
+        (, int256 price,,,) = i_priceFeed.latestRoundData();
         return ((audAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
     }
 } 

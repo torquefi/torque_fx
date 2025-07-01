@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./TorqueAccount.sol";
 import "./TorqueAccountFactory.sol";
 
@@ -29,7 +29,7 @@ contract TorqueAccountBundler is Ownable, ReentrancyGuard {
         address _accountContract,
         address _factory,
         address _entryPoint
-    ) {
+    ) Ownable(msg.sender) {
         accountContract = TorqueAccount(_accountContract);
         factory = TorqueAccountFactory(_factory);
         entryPoint = IEntryPoint(_entryPoint);
@@ -103,9 +103,9 @@ contract TorqueAccountBundler is Ownable, ReentrancyGuard {
 
         for (uint256 i = 0; i < amounts.length; i++) {
             if (isETH[i]) {
-                accountContract.requestWithdrawETH(accountId, amounts[i]);
+                accountContract.withdrawETH(accountId, amounts[i]);
             } else {
-                accountContract.requestWithdrawUSDC(accountId, amounts[i]);
+                accountContract.withdrawUSDC(accountId, amounts[i]);
             }
         }
 

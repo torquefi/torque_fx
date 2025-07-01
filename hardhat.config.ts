@@ -2,36 +2,73 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-verify";
+import "hardhat-deploy";
+import "hardhat-deploy-ethers";
 import "dotenv/config";
 import { EndpointId } from '@layerzerolabs/lz-definitions';
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.19",
+  solidity: {
+    compilers: [
+      { version: "0.8.20" },
+      { version: "0.8.28" }
+    ]
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0,
+    },
+  },
   networks: {
     ethereum: {
       url: process.env.ETHEREUM_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 1,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.etherscan.io",
+        },
+      },
     },
     arbitrum: {
       url: process.env.ARBITRUM_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 42161,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.arbiscan.io",
+        },
+      },
     },
     optimism: {
       url: process.env.OPTIMISM_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 10,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-optimistic.etherscan.io",
+        },
+      },
     },
     polygon: {
       url: process.env.POLYGON_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 137,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.polygonscan.com",
+        },
+      },
     },
     base: {
       url: process.env.BASE_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 8453,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.basescan.org",
+        },
+      },
     },
     sonic: {
       url: process.env.SONIC_RPC_URL || "",
@@ -47,6 +84,11 @@ const config: HardhatUserConfig = {
       url: process.env.BSC_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 56,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.bscscan.com",
+        },
+      },
     },
     hyperevm: {
       url: process.env.HYPEREVM_RPC_URL || "",
@@ -62,32 +104,78 @@ const config: HardhatUserConfig = {
       url: process.env.AVALANCHE_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 43114,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.snowtrace.io",
+        },
+      },
     },
     // Testnets
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 11155111,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-sepolia.etherscan.io",
+        },
+      },
     },
     arbitrumSepolia: {
       url: process.env.ARBITRUM_SEPOLIA_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 421614,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-sepolia.arbiscan.io",
+        },
+      },
     },
     optimismSepolia: {
       url: process.env.OPTIMISM_SEPOLIA_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 11155420,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-sepolia-optimistic.etherscan.io",
+        },
+      },
     },
     polygonMumbai: {
       url: process.env.POLYGON_MUMBAI_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 80001,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-testnet.polygonscan.com",
+        },
+      },
     },
     baseGoerli: {
       url: process.env.BASE_GOERLI_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
       chainId: 84531,
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-goerli.basescan.org",
+        },
+      },
+    },
+  },
+  etherscan: {
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY || "",
+      sepolia: process.env.SEPOLIA_ETHERSCAN_API_KEY || process.env.ETHERSCAN_API_KEY || "",
+      arbitrumOne: process.env.ARBISCAN_API_KEY || "",
+      arbitrumSepolia: process.env.ARBITRUM_SEPOLIA_ARBISCAN_API_KEY || process.env.ARBISCAN_API_KEY || "",
+      optimisticEthereum: process.env.OPTIMISM_API_KEY || "",
+      optimisticSepolia: process.env.OPTIMISM_SEPOLIA_API_KEY || process.env.OPTIMISM_API_KEY || "",
+      polygon: process.env.POLYGONSCAN_API_KEY || "",
+      polygonMumbai: process.env.POLYGON_MUMBAI_POLYGONSCAN_API_KEY || process.env.POLYGONSCAN_API_KEY || "",
+      base: process.env.BASESCAN_API_KEY || "",
+      baseGoerli: process.env.BASE_GOERLI_BASESCAN_API_KEY || process.env.BASESCAN_API_KEY || "",
+      bsc: process.env.BSCSCAN_API_KEY || "",
+      avalanche: process.env.SNOWTRACE_API_KEY || "",
     },
   },
 };
@@ -103,7 +191,6 @@ export const layerzeroMainnetEndpointIds = {
   avalanche: EndpointId.AVALANCHE_MAINNET,
   sonic: EndpointId.SONIC_MAINNET,
   abstract: EndpointId.ABSTRACT_MAINNET,
-  hyperevm: EndpointId.HYPEREVM_MAINNET,
   fraxtal: EndpointId.FRAXTAL_MAINNET,
 };
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./TorqueAccount.sol";
 
 contract TorqueAccountUpgrade is Ownable, ReentrancyGuard {
@@ -39,7 +39,7 @@ contract TorqueAccountUpgrade is Ownable, ReentrancyGuard {
     constructor(
         address _accountContract,
         address _guardian
-    ) {
+    ) Ownable(msg.sender) {
         accountContract = TorqueAccount(_accountContract);
         guardian = _guardian;
         isGuardian[_guardian] = true;

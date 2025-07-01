@@ -3,11 +3,11 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 
-contract TorqueStake is OApp, Ownable, ReentrancyGuard {
+contract TorqueStake is OApp, ReentrancyGuard {
     using Math for uint256;
 
     IERC20 public lpToken;
@@ -20,6 +20,7 @@ contract TorqueStake is OApp, Ownable, ReentrancyGuard {
     mapping(uint16 => address) public stakeAddresses; // chainId => stake contract address
     mapping(uint16 => mapping(address => uint256)) public crossChainStakes; // chainId => user => total staked
     mapping(address => uint256) public totalCrossChainStakes; // user => total staked across all chains
+    mapping(bytes32 => bool) public processedMessages; // Added for cross-chain message replay protection
 
     // Cross-chain stake request
     struct CrossChainStakeRequest {
@@ -219,63 +220,9 @@ contract TorqueStake is OApp, Ownable, ReentrancyGuard {
     /**
      * @dev Handle incoming cross-chain stake requests
      */
-    function _nonblockingLzReceive(
-        uint16 srcChainId,
-        bytes memory srcAddress,
-        uint64 nonce,
-        bytes memory payload
-    ) internal override {
-        CrossChainStakeRequest memory request = abi.decode(
-            payload,
-            (CrossChainStakeRequest)
-        );
 
-        try this._processCrossChainStake(request) {
-            emit CrossChainStakeCompleted(
-                request.user,
-                srcChainId,
-                request.amount,
-                request.isLp,
-                request.isStake
-            );
-        } catch Error(string memory reason) {
-            emit CrossChainStakeFailed(request.user, srcChainId, reason);
-        } catch {
-            emit CrossChainStakeFailed(request.user, srcChainId, "Unknown error");
-        }
-    }
 
-    /**
-     * @dev Process cross-chain stake request (external for try-catch)
-     */
-    function _processCrossChainStake(CrossChainStakeRequest memory request) external {
-        require(msg.sender == address(this), "Only self");
 
-        if (request.isStake) {
-            // Stake tokens
-            if (request.isLp) {
-                _stakeLpInternal(request.user, request.amount, request.lockDuration);
-                crossChainStakes[request.sourceChainId][request.user] += request.amount;
-            } else {
-                _stakeTorqInternal(request.user, request.amount, request.lockDuration);
-                crossChainStakes[request.sourceChainId][request.user] += request.amount;
-            }
-            totalCrossChainStakes[request.user] += request.amount;
-        } else {
-            // Unstake tokens
-            uint256 stakedAmount = crossChainStakes[request.sourceChainId][request.user];
-            require(stakedAmount > 0, "No cross-chain stake to unstake");
-
-            if (request.isLp) {
-                _unstakeLpInternal(request.user);
-            } else {
-                _unstakeTorqInternal(request.user);
-            }
-
-            crossChainStakes[request.sourceChainId][request.user] = 0;
-            totalCrossChainStakes[request.user] -= stakedAmount;
-        }
-    }
 
     /**
      * @dev Send cross-chain stake request
@@ -702,6 +649,85 @@ contract TorqueStake is OApp, Ownable, ReentrancyGuard {
         torqApr = _calculateAPR(torqStake.lockDuration);
 
         userVotePower = votePower[user];
+    }
+
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) internal override {
+        require(supportedChainIds[_origin.srcEid], "Chain not supported");
+        require(stakeAddresses[_origin.srcEid] == address(uint160(uint256(bytes32(_origin.sender)))), "Invalid stake contract");
+
+        bytes32 messageId = keccak256(abi.encodePacked(_origin.srcEid, _origin.sender, _guid));
+        require(!processedMessages[messageId], "Message already processed");
+        processedMessages[messageId] = true;
+
+        CrossChainStakeRequest memory request = abi.decode(_message, (CrossChainStakeRequest));
+        request.sourceChainId = _origin.srcEid;
+
+        // Process cross-chain stake request
+        if (request.isStake) {
+            _processCrossChainStake(request);
+        } else {
+            _processCrossChainUnstake(request);
+        }
+    }
+
+    function _processCrossChainStake(CrossChainStakeRequest memory request) internal {
+        if (request.isLp) {
+            Stake storage stake = lpStakes[request.user];
+            stake.amount += request.amount;
+            stake.lockEnd = block.timestamp + request.lockDuration;
+            stake.lastRewardTime = block.timestamp;
+            stake.lockDuration = request.lockDuration;
+            _updateVotePower(request.user);
+        } else {
+            Stake storage stake = torqStakes[request.user];
+            stake.amount += request.amount;
+            stake.lockEnd = block.timestamp + request.lockDuration;
+            stake.lastRewardTime = block.timestamp;
+            stake.lockDuration = request.lockDuration;
+            _updateVotePower(request.user);
+        }
+
+        crossChainStakes[request.sourceChainId][request.user] += request.amount;
+        totalCrossChainStakes[request.user] += request.amount;
+
+        emit CrossChainStakeCompleted(
+            request.user,
+            request.sourceChainId,
+            request.amount,
+            request.isLp,
+            true
+        );
+    }
+
+    function _processCrossChainUnstake(CrossChainStakeRequest memory request) internal {
+        if (request.isLp) {
+            Stake storage stake = lpStakes[request.user];
+            require(stake.amount >= request.amount, "Insufficient stake");
+            stake.amount -= request.amount;
+            _updateVotePower(request.user);
+        } else {
+            Stake storage stake = torqStakes[request.user];
+            require(stake.amount >= request.amount, "Insufficient stake");
+            stake.amount -= request.amount;
+            _updateVotePower(request.user);
+        }
+
+        crossChainStakes[request.sourceChainId][request.user] -= request.amount;
+        totalCrossChainStakes[request.user] -= request.amount;
+
+        emit CrossChainStakeCompleted(
+            request.user,
+            request.sourceChainId,
+            request.amount,
+            request.isLp,
+            false
+        );
     }
 
     /**

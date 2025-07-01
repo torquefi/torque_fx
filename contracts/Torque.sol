@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Torque is ERC20Burnable, ERC20Permit, ERC20Votes, OFT, Ownable {
+contract Torque is ERC20Burnable, ERC20Permit, ERC20Votes, OFT {
     event Minted(address indexed to, uint256 amount);
     event Burned(address indexed from, uint256 amount);
 
@@ -34,13 +34,11 @@ contract Torque is ERC20Burnable, ERC20Permit, ERC20Votes, OFT, Ownable {
         super._afterTokenTransfer(from, to, amount);
     }
 
-    function _mint(address to, uint256 amount) internal override(ERC20, ERC20Votes, OFT) {
-        super._mint(to, amount);
-        emit Minted(to, amount);
+    function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Votes) {
+        super._update(from, to, value);
     }
 
-    function _burn(address account, uint256 amount) internal override(ERC20, ERC20Votes, OFT) {
-        super._burn(account, amount);
-        emit Burned(account, amount);
+    function nonces(address owner) public view override(ERC20Permit, Nonces) returns (uint256) {
+        return super.nonces(owner);
     }
 }

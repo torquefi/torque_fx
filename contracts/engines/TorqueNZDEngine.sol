@@ -3,8 +3,9 @@ pragma solidity 0.8.20;
 
 import "./TorqueEngine.sol";
 import { TorqueNZD } from "../currencies/TorqueNZD.sol";
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TorqueNZDEngine is TorqueEngine {
     IERC20 private immutable i_collateralToken;
@@ -130,5 +131,23 @@ contract TorqueNZDEngine is TorqueEngine {
     function getTokenAmountFromNzd(uint256 nzdAmountInWei) public view returns (uint256) {
         (, int256 price,,,) = i_priceFeed.staleCheckLatestRoundData();
         return ((nzdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
+    }
+
+    // OFTCore required functions
+    function _debit(uint256 _amountLD, uint256 _minAmountLD, uint32 _dstEid) internal override returns (uint256 _amountSentLD, uint256 _feeDebitLD) {
+        _amountSentLD = _amountLD;
+        _feeDebitLD = 0;
+    }
+
+    function _credit(address _to, uint256 _amountLD, uint32 _srcEid) internal override returns (uint256 _amountReceivedLD) {
+        _amountReceivedLD = _amountLD;
+    }
+
+    function token() external view override returns (address) {
+        return address(this);
+    }
+
+    function approvalRequired() external pure override returns (bool) {
+        return false;
     }
 } 

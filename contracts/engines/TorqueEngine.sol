@@ -2,10 +2,10 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { OracleLib, AggregatorV3Interface } from "../libraries/OracleLib.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { OFTCore } from "@layerzerolabs/oft-evm/contracts/OFTCore.sol";
+import { OFTCore } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFTCore.sol";
 
 abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     using OracleLib for AggregatorV3Interface;
@@ -18,13 +18,13 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     error TorqueEngine__HealthFactorNotImproved();
 
     // Constants
-    uint256 private constant LIQUIDATION_THRESHOLD = 98; // 98% collateral threshold
-    uint256 private constant LIQUIDATION_BONUS = 20; // 20% bonus for liquidators
-    uint256 private constant LIQUIDATION_PRECISION = 100;
-    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
-    uint256 private constant PRECISION = 1e18;
-    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
-    uint256 private constant FEED_PRECISION = 1e8;
+    uint256 internal constant LIQUIDATION_THRESHOLD = 98; // 98% collateral threshold
+    uint256 internal constant LIQUIDATION_BONUS = 20; // 20% bonus for liquidators
+    uint256 internal constant LIQUIDATION_PRECISION = 100;
+    uint256 internal constant MIN_HEALTH_FACTOR = 1e18;
+    uint256 internal constant PRECISION = 1e18;
+    uint256 internal constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 internal constant FEED_PRECISION = 1e8;
 
     // State Variables
     mapping(address => uint256) private s_collateralDeposited;
@@ -45,7 +45,7 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
         _;
     }
 
-    constructor(address lzEndpoint) OFTCore(lzEndpoint) Ownable() {}
+    constructor(address lzEndpoint) OFTCore(18, lzEndpoint, msg.sender) Ownable(msg.sender) {}
 
     // Abstract functions to be implemented by currency-specific engines
     function getCollateralToken() public view virtual returns (IERC20);
@@ -164,5 +164,9 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
 
         // INTERACTIONS
         require(getCollateralToken().transfer(treasuryAddress, amount), "Transfer failed");
+    }
+
+    function mintTorque(uint256 amountToMint, address to) external onlyOwner {
+        _mintTorque(amountToMint, to);
     }
 } 

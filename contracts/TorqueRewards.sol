@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./4337/TorqueAccount.sol";
 
 interface ITorqueAccount {
@@ -34,7 +34,7 @@ contract TorqueRewards is Ownable, ReentrancyGuard {
     event CashbackRewardPaid(address indexed trader, uint256 amount);
     event RewardRatesUpdated(uint256 referralBps, uint256 cashbackBps);
 
-    constructor(address _rewardToken, address _torqueAccount) {
+    constructor(address _rewardToken, address _torqueAccount) Ownable(msg.sender) {
         rewardToken = IERC20(_rewardToken);
         torqueAccount = ITorqueAccount(_torqueAccount);
     }

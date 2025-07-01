@@ -3,8 +3,8 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "./4337/TorqueAccount.sol";
 
 interface ITorqueAccount {
@@ -30,12 +30,7 @@ interface ITorqueAccount {
     ) external;
 }
 
-interface ITorqueDEX {
-    function swap(address inputToken, uint256 inputAmount, uint256 accountId) external returns (uint256 outputAmount);
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-    function getPrice(address baseToken, address quoteToken) external view returns (uint256);
-}
+// ITorqueDEX interface is already defined in TorqueAccount.sol
 
 contract TorqueFX is Ownable, ReentrancyGuard {
     enum OrderType { MARKET, LIMIT, STOP_LOSS, TAKE_PROFIT }
@@ -126,7 +121,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     event OrderCancelled(address indexed user, bytes32 indexed pair, uint256 orderId);
     event PositionModified(address indexed user, bytes32 indexed pair, uint256 newCollateral, int256 newEntryPrice);
     event PriceFeedUpdated(bytes32 indexed pair, address feed);
-    event LiquidationThresholdsUpdated(uint256 partial, uint256 full);
+    event LiquidationThresholdsUpdated(uint256 partialThreshold, uint256 full);
     event CircuitBreakerToggled(bool active);
     event MaxPositionSizeUpdated(uint256 size);
     event DEXPoolUpdated(bytes32 indexed pair, address pool);
@@ -145,7 +140,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         address _accountContract,
         address _dexContract,
         address _usdc
-    ) {
+    ) Ownable(msg.sender) {
         accountContract = ITorqueAccount(_accountContract);
         dexContract = ITorqueDEX(_dexContract);
         usdc = IERC20(_usdc);
@@ -573,12 +568,12 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         emit PriceFeedUpdated(pair, feed);
     }
 
-    function setLiquidationThresholds(uint256 partial, uint256 full) external onlyOwner {
-        require(partial < full, "Invalid thresholds");
+    function setLiquidationThresholds(uint256 partialThreshold, uint256 full) external onlyOwner {
+        require(partialThreshold < full, "Invalid thresholds");
         require(full <= 10000, "Threshold too high");
-        partialLiquidationThreshold = partial;
+        partialLiquidationThreshold = partialThreshold;
         fullLiquidationThreshold = full;
-        emit LiquidationThresholdsUpdated(partial, full);
+        emit LiquidationThresholdsUpdated(partialThreshold, full);
     }
 
     function toggleCircuitBreaker() external onlyOwner {

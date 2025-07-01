@@ -2,12 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/interfaces/IOAppMsgInspector.sol";
-import "../TorqueAccount.sol";
+import "./TorqueAccount.sol";
 
-contract TorqueAccountCrossChain is OApp, Ownable, ReentrancyGuard {
+contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
     TorqueAccount public immutable accountContract;
     
     struct CrossChainOperation {
@@ -64,7 +64,7 @@ contract TorqueAccountCrossChain is OApp, Ownable, ReentrancyGuard {
     constructor(
         address _accountContract,
         address _lzEndpoint
-    ) OApp(_lzEndpoint, msg.sender) {
+    ) OApp(_lzEndpoint, msg.sender) Ownable(msg.sender) {
         accountContract = TorqueAccount(_accountContract);
     }
 
@@ -105,9 +105,8 @@ contract TorqueAccountCrossChain is OApp, Ownable, ReentrancyGuard {
 
         nonces[msg.sender]++;
 
-        lzEndpoint.send{value: msg.value - operation.amount}(
+        _lzSend(
             operation.dstChainId,
-            operation.dstAddress,
             payload,
             payable(msg.sender),
             address(0),
@@ -224,13 +223,12 @@ contract TorqueAccountCrossChain is OApp, Ownable, ReentrancyGuard {
 
     function estimateFee(
         uint16 dstChainId,
-        bytes calldata dstAddress,
         bytes calldata payload,
         bytes calldata adapterParams
     ) external view returns (uint256 nativeFee, uint256 zroFee) {
-        return lzEndpoint.estimateFees(
+        return endpoint.estimateFees(
             dstChainId,
-            dstAddress,
+            abi.encodePacked(remoteContracts[dstChainId]),
             payload,
             adapterParams
         );

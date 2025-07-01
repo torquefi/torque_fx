@@ -2,16 +2,18 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
+import { Origin } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/interfaces/IOAppReceiver.sol";
+import { MessagingFee } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import "./engines/TorqueEngine.sol";
 
 /**
  * @title TorqueBatchMinter
  * @dev Allows users to mint Torque tokens to multiple destination chains in a single transaction
  */
-contract TorqueBatchMinter is OApp, Ownable, ReentrancyGuard {
+contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
     
     // Events
     event BatchMintInitiated(
@@ -157,36 +159,38 @@ contract TorqueBatchMinter is OApp, Ownable, ReentrancyGuard {
     /**
      * @dev Handle incoming mint requests from other chains
      */
-    function _nonblockingLzReceive(
-        uint16 srcChainId,
-        bytes memory srcAddress,
-        uint64 nonce,
-        bytes memory payload
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
     ) internal override {
+        // Decode the message
         (address currency, address user, uint256 amount) = abi.decode(
-            payload,
+            _message,
             (address, address, uint256)
         );
         
         // Validate engine exists for this currency and chain
-        address engineAddress = engineAddresses[currency][srcChainId];
+        address engineAddress = engineAddresses[currency][uint16(_origin.srcEid)];
         if (engineAddress == address(0)) {
             emit BatchMintFailed(
                 user,
                 currency,
-                srcChainId,
+                uint16(_origin.srcEid),
                 amount,
                 "Engine not configured"
             );
             return;
         }
         
-        try TorqueEngine(engineAddress)._mintTorque(amount, user) {
-            emit BatchMintCompleted(user, currency, srcChainId, amount);
+        try TorqueEngine(engineAddress).mintTorque(amount, user) {
+            emit BatchMintCompleted(user, currency, uint16(_origin.srcEid), amount);
         } catch Error(string memory reason) {
-            emit BatchMintFailed(user, currency, srcChainId, amount, reason);
+            emit BatchMintFailed(user, currency, uint16(_origin.srcEid), amount, reason);
         } catch {
-            emit BatchMintFailed(user, currency, srcChainId, amount, "Unknown error");
+            emit BatchMintFailed(user, currency, uint16(_origin.srcEid), amount, "Unknown error");
         }
     }
     
@@ -195,7 +199,7 @@ contract TorqueBatchMinter is OApp, Ownable, ReentrancyGuard {
      */
     function _depositCollateral(address currency, uint256 amount) internal {
         // Get the engine for the current chain
-        address engineAddress = engineAddresses[currency][block.chainid];
+        address engineAddress = engineAddresses[currency][uint16(block.chainid)];
         if (engineAddress == address(0)) {
             revert TorqueBatchMinter__EngineNotSet();
         }
@@ -231,12 +235,13 @@ contract TorqueBatchMinter is OApp, Ownable, ReentrancyGuard {
         bytes memory payload = abi.encode(currency, msg.sender, amount);
         
         // Send cross-chain message
+        MessagingFee memory fee = _quote(dstChainId, payload, adapterParams, false);
         _lzSend(
             dstChainId,
             payload,
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            adapterParams,
+            fee,
+            payable(msg.sender)
         );
     }
     
