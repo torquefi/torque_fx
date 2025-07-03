@@ -294,6 +294,9 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             price,
             isLong
         );
+        
+        // Update user exposure
+        userTotalExposure[msg.sender]++;
 
         // INTERACTIONS
         usdc.transferFrom(msg.sender, address(this), collateral);
@@ -305,16 +308,15 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             accountId
         );
 
+        bytes32 pair = keccak256(abi.encodePacked(baseToken, quoteToken));
         emit PositionOpened(
             msg.sender,
-            accountId,
-            positionId,
-            baseToken,
-            quoteToken,
+            pair,
             collateral,
-            positionSize,
-            price,
-            isLong
+            leverage,
+            isLong,
+            accountId,
+            int256(price)
         );
     }
 
@@ -327,8 +329,9 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 price,
         bool isLong
     ) internal returns (uint256 positionId) {
-        positionId = positions[msg.sender].length;
-        positions[msg.sender][positionId] = Position({
+        bytes32 pair = keccak256(abi.encodePacked(baseToken, quoteToken));
+        positionId = userTotalExposure[msg.sender]; // Use a counter instead of array length
+        positions[msg.sender][pair] = Position({
             collateral: collateral,
             entryPrice: price,
             isLong: isLong,

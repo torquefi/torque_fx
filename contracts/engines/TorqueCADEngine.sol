@@ -142,13 +142,22 @@ contract TorqueCADEngine is TorqueEngine {
     }
 
     // OFTCore required functions
-    function _debit(uint256 _amountLD, uint256 _minAmountLD, uint32 _dstEid) internal virtual override returns (uint256 _amountSentLD, uint256 _feeDebitLD) {
-        _amountSentLD = _amountLD;
-        _feeDebitLD = 0;
+    function _debit(
+        address _from,
+        uint256 _amountLD,
+        uint256 _minAmountLD,
+        uint32 _dstEid
+    ) internal virtual override returns (uint256 amountSentLD, uint256 amountReceivedLD) {
+        amountSentLD = _amountLD;
+        amountReceivedLD = _amountLD;
     }
 
-    function _credit(address _to, uint256 _amountLD, uint32 _srcEid) internal virtual override returns (uint256 _amountReceivedLD) {
-        _amountReceivedLD = _amountLD;
+    function _credit(
+        address _to,
+        uint256 _amountLD,
+        uint32 _srcEid
+    ) internal virtual override returns (uint256 amountReceivedLD) {
+        amountReceivedLD = _amountLD;
     }
 
     function token() external view override returns (address) {

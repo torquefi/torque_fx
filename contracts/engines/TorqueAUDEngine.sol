@@ -140,4 +140,31 @@ contract TorqueAUDEngine is TorqueEngine {
         (, int256 price,,,) = i_priceFeed.latestRoundData();
         return ((audAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
     }
+
+    // OFTCore required functions
+    function _debit(
+        address _from,
+        uint256 _amountLD,
+        uint256 _minAmountLD,
+        uint32 _dstEid
+    ) internal virtual override returns (uint256 amountSentLD, uint256 amountReceivedLD) {
+        amountSentLD = _amountLD;
+        amountReceivedLD = _amountLD;
+    }
+
+    function _credit(
+        address _to,
+        uint256 _amountLD,
+        uint32 _srcEid
+    ) internal virtual override returns (uint256 amountReceivedLD) {
+        amountReceivedLD = _amountLD;
+    }
+
+    function token() external view override returns (address) {
+        return address(this);
+    }
+
+    function approvalRequired() external pure override returns (bool) {
+        return false;
+    }
 } 

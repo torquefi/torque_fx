@@ -5,6 +5,8 @@ import "./TorqueEngine.sol";
 import { TorqueCHF } from "../currencies/TorqueCHF.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Origin } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/interfaces/IOAppReceiver.sol";
+import { MessagingFee } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 
 contract TorqueCHFEngine is TorqueEngine {
     IERC20 private immutable i_collateralToken;
@@ -54,27 +56,32 @@ contract TorqueCHFEngine is TorqueEngine {
         depositCollateral(amountCollateral);
 
         // INTERACTIONS
+        bytes memory message = abi.encode(amountTorqueCHFToMint, msg.sender);
+        MessagingFee memory fee = _quote(dstChainId, message, adapterParams, false);
         _lzSend(
             dstChainId,
-            abi.encode(amountTorqueCHFToMint, msg.sender),
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            message,
+            adapterParams,
+            fee,
+            payable(msg.sender)
         );
     }
 
-    function _nonblockingLzReceive(
-        uint16,
-        bytes memory,
-        uint64,
-        bytes memory _payload
-    ) internal override {
-        // CHECKS
-        require(_payload.length > 0, "Invalid payload");
-
-        // EFFECTS
-        (uint256 amountTorqueCHFToMint, address user) = abi.decode(_payload, (uint256, address));
-        _mintTorque(amountTorqueCHFToMint, user);
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) internal virtual override {
+        // Call parent implementation first
+        super._lzReceive(_origin, _guid, _message, _executor, _extraData);
+        
+        // Additional custom logic for minting TorqueCHF
+        if (_message.length > 0) {
+            (uint256 amountTorqueCHFToMint, address user) = abi.decode(_message, (uint256, address));
+            _mintTorque(amountTorqueCHFToMint, user);
+        }
     }
 
     function redeemCollateralForTorqueCHF(
@@ -94,12 +101,14 @@ contract TorqueCHFEngine is TorqueEngine {
         _redeemCollateral(amountCollateral, msg.sender, msg.sender);
 
         // INTERACTIONS
+        bytes memory message = abi.encode(amountTorqueCHFToBurn, msg.sender);
+        MessagingFee memory fee = _quote(dstChainId, message, adapterParams, false);
         _lzSend(
             dstChainId,
-            abi.encode(amountTorqueCHFToBurn, msg.sender),
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            message,
+            adapterParams,
+            fee,
+            payable(msg.sender)
         );
     }
 
@@ -128,7 +137,34 @@ contract TorqueCHFEngine is TorqueEngine {
     }
 
     function getTokenAmountFromChf(uint256 chfAmountInWei) public view returns (uint256) {
-        (, int256 price,,,) = i_priceFeed.staleCheckLatestRoundData();
+        (, int256 price,,,) = i_priceFeed.latestRoundData();
         return ((chfAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
+    }
+
+    // OFTCore required functions
+    function _debit(
+        address _from,
+        uint256 _amountLD,
+        uint256 _minAmountLD,
+        uint32 _dstEid
+    ) internal virtual override returns (uint256 amountSentLD, uint256 amountReceivedLD) {
+        amountSentLD = _amountLD;
+        amountReceivedLD = _amountLD;
+    }
+
+    function _credit(
+        address _to,
+        uint256 _amountLD,
+        uint32 _srcEid
+    ) internal virtual override returns (uint256 amountReceivedLD) {
+        amountReceivedLD = _amountLD;
+    }
+
+    function token() external view override returns (address) {
+        return address(this);
+    }
+
+    function approvalRequired() external pure override returns (bool) {
+        return false;
     }
 } 

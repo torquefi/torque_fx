@@ -12,10 +12,11 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     mapping(bytes32 => Pool) public pools;
     mapping(address => bool) public isPool;
     address[] public allPools;
+    // Track number of ranges per user
+    mapping(address => uint256) public userRangeCount;
     
-    // TUSD as quote asset
-    address public tusdToken;
-    bool public tusdSet = false;
+    address public defaultQuoteAsset;
+    bool public defaultQuoteAssetSet = false;
     
     // Default parameters
     address public defaultFeeRecipient;
@@ -29,7 +30,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     // Pool structure
     struct Pool {
         address baseToken;
-        address tusdToken;
+        address quoteToken;
         address lpToken;
         uint256 feeBps;
         address feeRecipient;
@@ -62,6 +63,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     struct CrossChainLiquidityRequest {
         address user;
         address baseToken;
+        address quoteToken;
         uint256 amount0;
         uint256 amount1;
         int256 lowerTick;
@@ -80,19 +82,20 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     // Events
     event PoolCreated(
         address indexed baseToken,
+        address indexed quoteToken,
         address indexed lpToken,
         string pairName,
         string pairSymbol,
         uint256 feeBps,
         address feeRecipient
     );
-    event PoolDeactivated(address indexed baseToken);
-    event LiquidityAdded(address indexed user, address indexed baseToken, uint256 amount0, uint256 amount1, uint256 liquidity);
-    event LiquidityRemoved(address indexed user, address indexed baseToken, uint256 liquidity, uint256 amount0, uint256 amount1);
-    event SwapExecuted(address indexed user, address indexed baseToken, address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut);
-    event RangeAdded(address indexed user, address indexed baseToken, int256 lowerTick, int256 upperTick, uint256 liquidity);
-    event RangeRemoved(address indexed user, address indexed baseToken, int256 lowerTick, int256 upperTick, uint256 liquidity);
-    event TUSDTokenSet(address indexed oldTUSD, address indexed newTUSD);
+    event PoolDeactivated(address indexed baseToken, address indexed quoteToken);
+    event LiquidityAdded(address indexed user, address indexed baseToken, address indexed quoteToken, uint256 amount0, uint256 amount1, uint256 liquidity);
+    event LiquidityRemoved(address indexed user, address indexed baseToken, address indexed quoteToken, uint256 liquidity, uint256 amount0, uint256 amount1);
+    event SwapExecuted(address indexed user, address indexed baseToken, address indexed quoteToken, address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut);
+    event RangeAdded(address indexed user, address indexed baseToken, address indexed quoteToken, int256 lowerTick, int256 upperTick, uint256 liquidity);
+    event RangeRemoved(address indexed user, address indexed baseToken, address indexed quoteToken, int256 lowerTick, int256 upperTick, uint256 liquidity);
+    event DefaultQuoteAssetSet(address indexed oldQuoteAsset, address indexed newQuoteAsset);
     event DefaultFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
     event DefaultFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event DefaultIsStablePairUpdated(bool oldIsStable, bool newIsStable);
@@ -101,7 +104,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     event CrossChainLiquidityRequested(
         address indexed user,
         address indexed baseToken,
-        uint16 indexed dstChainId,
+        address indexed quoteToken,
+        uint16 dstChainId,
         uint256 amount0,
         uint256 amount1,
         int256 lowerTick,
@@ -111,7 +115,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     event CrossChainLiquidityCompleted(
         address indexed user,
         address indexed baseToken,
-        uint16 indexed srcChainId,
+        address indexed quoteToken,
+        uint16 srcChainId,
         uint256 liquidity,
         uint256 amount0,
         uint256 amount1,
@@ -120,76 +125,66 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     event CrossChainLiquidityFailed(
         address indexed user,
         address indexed baseToken,
-        uint16 indexed srcChainId,
+        address indexed quoteToken,
+        uint16 srcChainId,
         string reason
     );
 
     // Errors
-    error TorqueDEX__PairAlreadyExists();
+    error TorqueDEX__DefaultQuoteAssetNotSet();
     error TorqueDEX__InvalidTokens();
     error TorqueDEX__InvalidFeeRecipient();
-    error TorqueDEX__InvalidFeeBps();
-    error TorqueDEX__TUSDNotSet();
-    error TorqueDEX__BaseTokenCannotBeTUSD();
-    error TorqueDEX__TUSDAlreadySet();
+    error TorqueDEX__PairAlreadyExists();
     error TorqueDEX__PoolNotFound();
-    error TorqueDEX__PoolInactive();
-    error TorqueDEX__UnsupportedChain();
-    error TorqueDEX__InvalidDEXAddress();
-    error TorqueDEX__CrossChainLiquidityFailed();
     error TorqueDEX__InsufficientLiquidity();
     error TorqueDEX__SlippageExceeded();
+    error TorqueDEX__UnsupportedChain();
+    error TorqueDEX__CrossChainLiquidityFailed();
 
     constructor(
         address _lzEndpoint,
-        address _owner,
-        address _defaultFeeRecipient
-    ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
-        defaultFeeRecipient = _defaultFeeRecipient;
-        _initializeSupportedChains();
-    }
-    
+        address _owner
+    ) OApp(_lzEndpoint, _owner) {}
+
     /**
-     * @dev Set TUSD token address (can only be set once)
+     * @dev Set the default quote asset (e.g., TUSD)
      */
-    function setTUSDToken(address _tusdToken) external onlyOwner {
-        if (tusdSet) {
-            revert TorqueDEX__TUSDAlreadySet();
-        }
-        if (_tusdToken == address(0)) {
+    function setDefaultQuoteAsset(address _defaultQuoteAsset) external onlyOwner {
+        if (_defaultQuoteAsset == address(0)) {
             revert TorqueDEX__InvalidTokens();
         }
         
-        address oldTUSD = tusdToken;
-        tusdToken = _tusdToken;
-        tusdSet = true;
+        address oldQuoteAsset = defaultQuoteAsset;
+        defaultQuoteAsset = _defaultQuoteAsset;
+        defaultQuoteAssetSet = true;
         
-        emit TUSDTokenSet(oldTUSD, _tusdToken);
+        emit DefaultQuoteAssetSet(oldQuoteAsset, _defaultQuoteAsset);
     }
     
     /**
-     * @dev Create a new trading pool for a trading pair with TUSD as quote asset
+     * @dev Create a new trading pool for any token pair
      */
     function createPool(
         address baseToken,
+        address quoteToken,
         string memory pairName,
         string memory pairSymbol,
         address feeRecipient,
         bool isStablePair
     ) external onlyOwner returns (address lpTokenAddress) {
         // Validations
-        if (!tusdSet) {
-            revert TorqueDEX__TUSDNotSet();
+        if (baseToken == address(0) || quoteToken == address(0)) {
+            revert TorqueDEX__InvalidTokens();
         }
-        if (baseToken == address(0) || baseToken == tusdToken) {
-            revert TorqueDEX__BaseTokenCannotBeTUSD();
+        if (baseToken == quoteToken) {
+            revert TorqueDEX__InvalidTokens();
         }
         if (feeRecipient == address(0)) {
             revert TorqueDEX__InvalidFeeRecipient();
         }
         
         // Check if pair already exists
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         if (pools[pairHash].active) {
             revert TorqueDEX__PairAlreadyExists();
         }
@@ -203,24 +198,24 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         lpToken.setDEX(address(this));
         
         // Create pool
-        pools[pairHash] = Pool({
-            baseToken: baseToken,
-            tusdToken: tusdToken,
-            lpToken: address(lpToken),
-            feeBps: defaultFeeBps,
-            feeRecipient: feeRecipient,
-            isStablePair: isStablePair,
-            active: true,
-            totalLiquidity: 0,
-            currentTick: 0,
-            currentSqrtPriceX96: 0
-        });
+        Pool storage pool = pools[pairHash];
+        pool.baseToken = baseToken;
+        pool.quoteToken = quoteToken;
+        pool.lpToken = address(lpToken);
+        pool.feeBps = defaultFeeBps;
+        pool.feeRecipient = feeRecipient;
+        pool.isStablePair = isStablePair;
+        pool.active = true;
+        pool.totalLiquidity = 0;
+        pool.currentTick = 0;
+        pool.currentSqrtPriceX96 = 0;
         
         isPool[address(lpToken)] = true;
         allPools.push(address(lpToken));
         
         emit PoolCreated(
             baseToken,
+            quoteToken,
             address(lpToken),
             pairName,
             pairSymbol,
@@ -232,15 +227,19 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Create pool with default parameters
+     * @dev Create pool with default quote asset (TUSD)
      */
-    function createPoolWithDefaults(
+    function createPoolWithDefaultQuote(
         address baseToken,
         string memory pairName,
         string memory pairSymbol
     ) external onlyOwner returns (address lpTokenAddress) {
+        if (!defaultQuoteAssetSet) {
+            revert TorqueDEX__DefaultQuoteAssetNotSet();
+        }
         return this.createPool(
             baseToken,
+            defaultQuoteAsset,
             pairName,
             pairSymbol,
             defaultFeeRecipient,
@@ -249,28 +248,45 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Get pool for a base token (TUSD is always the quote asset)
+     * @dev Get pool info for a token pair
+     * Returns only non-mapping fields.
      */
-    function getPool(address baseToken) external view returns (Pool memory) {
-        if (!tusdSet) {
-            revert TorqueDEX__TUSDNotSet();
-        }
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+    function getPool(address baseToken, address quoteToken) external view returns (
+        address baseToken_,
+        address quoteToken_,
+        address lpToken_,
+        uint256 feeBps_,
+        address feeRecipient_,
+        bool isStablePair_,
+        bool active_,
+        uint256 totalLiquidity_,
+        int256 currentTick_,
+        uint256 currentSqrtPriceX96_
+    ) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
         }
-        return pool;
+        return (
+            pool.baseToken,
+            pool.quoteToken,
+            pool.lpToken,
+            pool.feeBps,
+            pool.feeRecipient,
+            pool.isStablePair,
+            pool.active,
+            pool.totalLiquidity,
+            pool.currentTick,
+            pool.currentSqrtPriceX96
+        );
     }
     
     /**
-     * @dev Get pool address for a base token
+     * @dev Get pool address for a token pair
      */
-    function getPoolAddress(address baseToken) external view returns (address) {
-        if (!tusdSet) {
-            revert TorqueDEX__TUSDNotSet();
-        }
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+    function getPoolAddress(address baseToken, address quoteToken) external view returns (address) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
@@ -293,27 +309,24 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Check if a base token has a pool
+     * @dev Check if a token pair has a pool
      */
-    function hasPool(address baseToken) external view returns (bool) {
-        if (!tusdSet) {
-            return false;
-        }
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+    function hasPool(address baseToken, address quoteToken) external view returns (bool) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         return pools[pairHash].active;
     }
     
     /**
      * @dev Deactivate a pool
      */
-    function deactivatePool(address baseToken) external onlyOwner {
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+    function deactivatePool(address baseToken, address quoteToken) external onlyOwner {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
         }
         pool.active = false;
-        emit PoolDeactivated(baseToken);
+        emit PoolDeactivated(baseToken, quoteToken);
     }
     
     /**
@@ -321,22 +334,23 @@ contract TorqueDEX is OApp, ReentrancyGuard {
      */
     function swap(
         address baseToken,
+        address quoteToken,
         address tokenIn,
         uint256 amountIn,
         uint256 minAmountOut
     ) external nonReentrant returns (uint256 amountOut) {
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
         }
         
         // Validate tokens
-        if (tokenIn != pool.baseToken && tokenIn != pool.tusdToken) {
+        if (tokenIn != pool.baseToken && tokenIn != pool.quoteToken) {
             revert TorqueDEX__InvalidTokens();
         }
         
-        address tokenOut = tokenIn == pool.baseToken ? pool.tusdToken : pool.baseToken;
+        address tokenOut = tokenIn == pool.baseToken ? pool.quoteToken : pool.baseToken;
         
         // Transfer tokens in
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
@@ -357,7 +371,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             IERC20(tokenIn).transfer(pool.feeRecipient, fee);
         }
         
-        emit SwapExecuted(msg.sender, baseToken, tokenIn, amountIn, tokenOut, amountOut);
+        emit SwapExecuted(msg.sender, baseToken, quoteToken, tokenIn, amountIn, tokenOut, amountOut);
         
         return amountOut;
     }
@@ -367,12 +381,13 @@ contract TorqueDEX is OApp, ReentrancyGuard {
      */
     function addLiquidity(
         address baseToken,
+        address quoteToken,
         uint256 amount0,
         uint256 amount1,
         int256 lowerTick,
         int256 upperTick
     ) external nonReentrant returns (uint256 liquidity) {
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
@@ -380,7 +395,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         
         // Transfer tokens
         IERC20(pool.baseToken).transferFrom(msg.sender, address(this), amount0);
-        IERC20(pool.tusdToken).transferFrom(msg.sender, address(this), amount1);
+        IERC20(pool.quoteToken).transferFrom(msg.sender, address(this), amount1);
         
         // Calculate liquidity (simplified)
         liquidity = _calculateLiquidity(amount0, amount1, lowerTick, upperTick);
@@ -398,13 +413,15 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             amount0: amount0,
             amount1: amount1
         });
-        pool.userRanges[msg.sender][pool.userRanges[msg.sender].length] = newRange;
+        uint256 rangeIndex = userRangeCount[msg.sender];
+        pool.userRanges[msg.sender][rangeIndex].push(newRange);
+        userRangeCount[msg.sender]++;
         
         // Mint LP tokens
         TorqueLP(pool.lpToken).mint(msg.sender, liquidity);
         
-        emit LiquidityAdded(msg.sender, baseToken, amount0, amount1, liquidity);
-        emit RangeAdded(msg.sender, baseToken, lowerTick, upperTick, liquidity);
+        emit LiquidityAdded(msg.sender, baseToken, quoteToken, amount0, amount1, liquidity);
+        emit RangeAdded(msg.sender, baseToken, quoteToken, lowerTick, upperTick, liquidity);
         
         return liquidity;
     }
@@ -414,20 +431,23 @@ contract TorqueDEX is OApp, ReentrancyGuard {
      */
     function removeLiquidity(
         address baseToken,
+        address quoteToken,
         uint256 liquidity,
         uint256 rangeIndex
     ) external nonReentrant returns (uint256 amount0, uint256 amount1) {
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
         }
         
         // Burn LP tokens
-        TorqueLP(pool.lpToken).burnFrom(msg.sender, liquidity);
+        TorqueLP(pool.lpToken).burn(msg.sender, liquidity);
         
         // Get user range
-        Range storage range = pool.userRanges[msg.sender][rangeIndex];
+        Range[] storage ranges = pool.userRanges[msg.sender][rangeIndex];
+        require(ranges.length > 0, "No ranges found");
+        Range storage range = ranges[0]; // For now, use the first range
         require(range.liquidity >= liquidity, "Insufficient liquidity");
         
         // Calculate amounts (simplified)
@@ -446,10 +466,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         
         // Transfer tokens
         IERC20(pool.baseToken).transfer(msg.sender, amount0);
-        IERC20(pool.tusdToken).transfer(msg.sender, amount1);
+        IERC20(pool.quoteToken).transfer(msg.sender, amount1);
         
-        emit LiquidityRemoved(msg.sender, baseToken, liquidity, amount0, amount1);
-        emit RangeRemoved(msg.sender, baseToken, range.lowerTick, range.upperTick, liquidity);
+        emit LiquidityRemoved(msg.sender, baseToken, quoteToken, liquidity, amount0, amount1);
+        emit RangeRemoved(msg.sender, baseToken, quoteToken, range.lowerTick, range.upperTick, liquidity);
         
         return (amount0, amount1);
     }
@@ -459,6 +479,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
      */
     function addCrossChainLiquidity(
         address baseToken,
+        address quoteToken,
         uint16[] calldata dstChainIds,
         uint256[] calldata amounts0,
         uint256[] calldata amounts1,
@@ -475,7 +496,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             "Array length mismatch"
         );
 
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
@@ -488,13 +509,14 @@ contract TorqueDEX is OApp, ReentrancyGuard {
 
             // Transfer tokens to this contract first
             IERC20(pool.baseToken).transferFrom(msg.sender, address(this), amounts0[i]);
-            IERC20(pool.tusdToken).transferFrom(msg.sender, address(this), amounts1[i]);
+            IERC20(pool.quoteToken).transferFrom(msg.sender, address(this), amounts1[i]);
 
             // Send cross-chain liquidity request
             _sendCrossChainLiquidityRequest(
                 dstChainIds[i],
                 msg.sender,
                 baseToken,
+                quoteToken,
                 amounts0[i],
                 amounts1[i],
                 lowerTicks[i],
@@ -506,6 +528,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             emit CrossChainLiquidityRequested(
                 msg.sender,
                 baseToken,
+                quoteToken,
                 dstChainIds[i],
                 amounts0[i],
                 amounts1[i],
@@ -521,6 +544,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
      */
     function removeCrossChainLiquidity(
         address baseToken,
+        address quoteToken,
         uint16[] calldata dstChainIds,
         uint256[] calldata liquidityAmounts,
         bytes[] calldata adapterParams
@@ -531,7 +555,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             "Array length mismatch"
         );
 
-        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
@@ -547,6 +571,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 dstChainIds[i],
                 msg.sender,
                 baseToken,
+                quoteToken,
                 0,
                 0,
                 0,
@@ -558,6 +583,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             emit CrossChainLiquidityRequested(
                 msg.sender,
                 baseToken,
+                quoteToken,
                 dstChainIds[i],
                 0,
                 0,
@@ -568,24 +594,14 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    function _initializeSupportedChains() internal {
-        supportedChainIds[1] = true;      // Ethereum
-        supportedChainIds[42161] = true;  // Arbitrum
-        supportedChainIds[10] = true;     // Optimism
-        supportedChainIds[137] = true;    // Polygon
-        supportedChainIds[8453] = true;   // Base
-        supportedChainIds[146] = true;    // Sonic
-        supportedChainIds[2741] = true;   // Abstract
-        supportedChainIds[56] = true;     // BSC
-        supportedChainIds[999] = true;    // HyperEVM
-        supportedChainIds[252] = true;    // Fraxtal
-        supportedChainIds[43114] = true;  // Avalanche
-    }
-
+    /**
+     * @dev Send cross-chain liquidity request
+     */
     function _sendCrossChainLiquidityRequest(
         uint16 dstChainId,
         address user,
         address baseToken,
+        address quoteToken,
         uint256 amount0,
         uint256 amount1,
         int256 lowerTick,
@@ -596,11 +612,12 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         CrossChainLiquidityRequest memory request = CrossChainLiquidityRequest({
             user: user,
             baseToken: baseToken,
+            quoteToken: quoteToken,
             amount0: amount0,
             amount1: amount1,
             lowerTick: lowerTick,
             upperTick: upperTick,
-            sourceChainId: 0, // Will be set by destination
+            sourceChainId: 0, // Will be set in _lzReceive
             isAdd: isAdd
         });
 
@@ -609,10 +626,14 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             abi.encode(request),
             payable(msg.sender),
             address(0),
-            adapterParams
+            adapterParams,
+            address(this).balance
         );
     }
 
+    /**
+     * @dev Handle cross-chain liquidity requests
+     */
     function _lzReceive(
         Origin calldata _origin,
         bytes32 _guid,
@@ -621,7 +642,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         bytes calldata _extraData
     ) internal override {
         CrossChainLiquidityRequest memory request = abi.decode(_message, (CrossChainLiquidityRequest));
-        request.sourceChainId = _origin.srcEid;
+        request.sourceChainId = uint16(_origin.srcEid);
 
         // Process cross-chain liquidity request
         if (request.isAdd) {
@@ -631,16 +652,15 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-
-
     function _processCrossChainLiquidityAdd(CrossChainLiquidityRequest memory request) internal {
-        bytes32 pairHash = keccak256(abi.encodePacked(request.baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(request.baseToken, request.quoteToken));
         Pool storage pool = pools[pairHash];
         
         if (!pool.active) {
             emit CrossChainLiquidityFailed(
                 request.user,
                 request.baseToken,
+                request.quoteToken,
                 request.sourceChainId,
                 "Pool not found"
             );
@@ -666,6 +686,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         emit CrossChainLiquidityCompleted(
             request.user,
             request.baseToken,
+            request.quoteToken,
             request.sourceChainId,
             liquidity,
             request.amount0,
@@ -675,13 +696,14 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
 
     function _processCrossChainLiquidityRemove(CrossChainLiquidityRequest memory request) internal {
-        bytes32 pairHash = keccak256(abi.encodePacked(request.baseToken, tusdToken));
+        bytes32 pairHash = keccak256(abi.encodePacked(request.baseToken, request.quoteToken));
         Pool storage pool = pools[pairHash];
         
         if (!pool.active) {
             emit CrossChainLiquidityFailed(
                 request.user,
                 request.baseToken,
+                request.quoteToken,
                 request.sourceChainId,
                 "Pool not found"
             );
@@ -693,6 +715,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         emit CrossChainLiquidityCompleted(
             request.user,
             request.baseToken,
+            request.quoteToken,
             request.sourceChainId,
             0,
             0,
@@ -722,39 +745,35 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
 
     // Admin functions
-    function setDefaultFeeRecipient(address _defaultFeeRecipient) external onlyOwner {
-        if (_defaultFeeRecipient == address(0)) {
+    function setDefaultFeeRecipient(address _feeRecipient) external onlyOwner {
+        if (_feeRecipient == address(0)) {
             revert TorqueDEX__InvalidFeeRecipient();
         }
         address oldRecipient = defaultFeeRecipient;
-        defaultFeeRecipient = _defaultFeeRecipient;
-        emit DefaultFeeRecipientUpdated(oldRecipient, _defaultFeeRecipient);
+        defaultFeeRecipient = _feeRecipient;
+        emit DefaultFeeRecipientUpdated(oldRecipient, _feeRecipient);
     }
 
-    function setDefaultFeeBps(uint256 _defaultFeeBps) external onlyOwner {
-        if (_defaultFeeBps > 1000) { // Max 10%
-            revert TorqueDEX__InvalidFeeBps();
-        }
+    function setDefaultFeeBps(uint256 _feeBps) external onlyOwner {
+        require(_feeBps <= 1000, "Fee too high"); // Max 10%
         uint256 oldFeeBps = defaultFeeBps;
-        defaultFeeBps = _defaultFeeBps;
-        emit DefaultFeeBpsUpdated(oldFeeBps, _defaultFeeBps);
+        defaultFeeBps = _feeBps;
+        emit DefaultFeeBpsUpdated(oldFeeBps, _feeBps);
     }
 
-    function setDefaultIsStablePair(bool _defaultIsStablePair) external onlyOwner {
+    function setDefaultIsStablePair(bool _isStablePair) external onlyOwner {
         bool oldIsStable = defaultIsStablePair;
-        defaultIsStablePair = _defaultIsStablePair;
-        emit DefaultIsStablePairUpdated(oldIsStable, _defaultIsStablePair);
+        defaultIsStablePair = _isStablePair;
+        emit DefaultIsStablePairUpdated(oldIsStable, _isStablePair);
     }
 
-    function setDexAddress(uint16 chainId, address dexAddress) external onlyOwner {
-        if (!supportedChainIds[chainId]) {
-            revert TorqueDEX__UnsupportedChain();
-        }
+    function addSupportedChain(uint16 chainId, address dexAddress) external onlyOwner {
+        supportedChainIds[chainId] = true;
         dexAddresses[chainId] = dexAddress;
     }
 
-    // Emergency functions
-    function emergencyWithdraw(address token, address to, uint256 amount) external onlyOwner {
-        IERC20(token).transfer(to, amount);
+    function removeSupportedChain(uint16 chainId) external onlyOwner {
+        supportedChainIds[chainId] = false;
+        delete dexAddresses[chainId];
     }
 }

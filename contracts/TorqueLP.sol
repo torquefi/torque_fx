@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TorqueLP is OFT {
     address public dex;

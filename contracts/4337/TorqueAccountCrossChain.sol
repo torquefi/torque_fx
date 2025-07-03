@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/interfaces/IOAppMsgInspector.sol";
+import { MessagingFee } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import "./TorqueAccount.sol";
 
 contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
     TorqueAccount public immutable accountContract;
     
     struct CrossChainOperation {
-        uint16 dstChainId;
+        uint32 dstChainId;
         bytes dstAddress;
         uint256 accountId;
         uint256 amount;
@@ -30,8 +31,8 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
         bytes signature;
     }
 
-    mapping(uint16 => bool) public supportedChains;
-    mapping(uint16 => address) public remoteContracts;
+    mapping(uint32 => bool) public supportedChains;
+    mapping(uint32 => address) public remoteContracts;
     mapping(bytes32 => bool) public processedMessages;
     mapping(address => uint256) public nonces;
     mapping(bytes32 => bool) public executedOperations;
@@ -51,8 +52,8 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
         uint256 amount,
         bool isETH
     );
-    event ChainSupported(uint16 indexed chainId, bool supported);
-    event RemoteContractSet(uint16 indexed chainId, address remoteContract);
+    event ChainSupported(uint32 indexed chainId, bool supported);
+    event RemoteContractSet(uint32 indexed chainId, address remoteContract);
     event GasOptimizedOperationExecuted(
         address indexed user,
         uint256 accountId,
@@ -68,12 +69,12 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
         accountContract = TorqueAccount(_accountContract);
     }
 
-    function setSupportedChain(uint16 chainId, bool supported) external onlyOwner {
+    function setSupportedChain(uint32 chainId, bool supported) external onlyOwner {
         supportedChains[chainId] = supported;
         emit ChainSupported(chainId, supported);
     }
 
-    function setRemoteContract(uint16 chainId, address remoteContract) external onlyOwner {
+    function setRemoteContract(uint32 chainId, address remoteContract) external onlyOwner {
         require(supportedChains[chainId], "Chain not supported");
         remoteContracts[chainId] = remoteContract;
         emit RemoteContractSet(chainId, remoteContract);
@@ -105,17 +106,18 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
 
         nonces[msg.sender]++;
 
+        MessagingFee memory fee = _quote(uint16(operation.dstChainId), payload, adapterParams, false);
         _lzSend(
-            operation.dstChainId,
+            uint16(operation.dstChainId),
             payload,
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            adapterParams,
+            fee,
+            payable(msg.sender)
         );
 
         emit CrossChainOperationInitiated(
             msg.sender,
-            operation.dstChainId,
+            uint16(operation.dstChainId),
             operation.accountId,
             operation.amount,
             operation.isETH,
@@ -172,8 +174,8 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
         address _executor,
         bytes calldata _extraData
     ) internal override {
-        require(supportedChains[_origin.srcEid], "Chain not supported");
-        require(remoteContracts[_origin.srcEid] == address(uint160(uint256(bytes32(_origin.sender)))), "Invalid remote contract");
+        require(supportedChains[uint16(_origin.srcEid)], "Chain not supported");
+        require(remoteContracts[uint16(_origin.srcEid)] == address(uint160(uint256(bytes32(_origin.sender)))), "Invalid remote contract");
 
         bytes32 messageId = keccak256(abi.encodePacked(_origin.srcEid, _origin.sender, _guid));
         require(!processedMessages[messageId], "Message already processed");
@@ -197,7 +199,7 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
 
         emit CrossChainOperationCompleted(
             user,
-            _origin.srcEid,
+            uint16(_origin.srcEid),
             accountId,
             amount,
             isETH
@@ -222,15 +224,11 @@ contract TorqueAccountCrossChain is OApp, ReentrancyGuard {
     }
 
     function estimateFee(
-        uint16 dstChainId,
+        uint32 dstChainId,
         bytes calldata payload,
         bytes calldata adapterParams
     ) external view returns (uint256 nativeFee, uint256 zroFee) {
-        return endpoint.estimateFees(
-            dstChainId,
-            abi.encodePacked(remoteContracts[dstChainId]),
-            payload,
-            adapterParams
-        );
+        MessagingFee memory fee = _quote(uint16(dstChainId), payload, adapterParams, false);
+        return (fee.nativeFee, fee.lzTokenFee);
     }
 } 

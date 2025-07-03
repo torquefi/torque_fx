@@ -66,7 +66,7 @@ contract TorqueAccountRecovery is Ownable, ReentrancyGuard {
                 block.chainid
             )
         );
-        bytes32 ethSignedMessageHash = messageHash.toEthSignedMessageHash();
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
         address signer = ethSignedMessageHash.recover(signature);
         require(signer == oldOwner, "Invalid signature");
 

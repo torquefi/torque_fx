@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@account-abstraction/contracts/core/BaseAccount.sol";
 import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import "@account-abstraction/contracts/core/UserOperationLib.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 
 interface ITorqueDEX {
@@ -241,11 +242,10 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         return _entryPoint;
     }
 
-    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
-        internal
-        virtual
-        returns (uint256 validationData)
-    {
+    function _validateSignature(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash
+    ) internal virtual override returns (uint256 validationData) {
         bytes32 hash = keccak256(abi.encodePacked(userOpHash));
         address signer = hash.recover(userOp.signature);
         if (owner() != signer) return SIG_VALIDATION_FAILED;
