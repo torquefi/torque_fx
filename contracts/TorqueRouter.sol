@@ -11,7 +11,11 @@ interface ITorqueAccount {
         bool exists,
         bool active,
         string memory username,
-        address referrer
+        address referrer,
+        uint256 lastDepositTime,
+        uint256 lastWithdrawTime,
+        uint256[] memory openPositions,
+        uint256 nonce
     );
     function isValidAccount(address user, uint256 accountId) external view returns (bool);
 }
@@ -91,7 +95,7 @@ contract TorqueRouter is Ownable {
     }
 
     function isValidAccount(address user, uint256 accountId) public view returns (bool) {
-        (, bool exists, , bool active, , ) = torqueAccount.userAccounts(user, accountId);
+        (, bool exists, bool active, , , , , , ) = torqueAccount.userAccounts(user, accountId);
         return exists && active;
     }
 }

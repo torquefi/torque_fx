@@ -333,7 +333,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         positionId = userTotalExposure[msg.sender]; // Use a counter instead of array length
         positions[msg.sender][pair] = Position({
             collateral: collateral,
-            entryPrice: price,
+            entryPrice: int256(price),
             isLong: isLong,
             accountId: accountId,
             lastLiquidationAmount: 0,
@@ -422,12 +422,12 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
     function closePosition(
         uint256 accountId,
-        uint256 positionId
+        bytes32 pair
     ) external returns (uint256 pnl) {
         // CHECKS
         require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
         
-        Position storage position = positions[positionId];
+        Position storage position = positions[msg.sender][pair];
         require(position.accountId == accountId, "Position not found");
         require(position.isOpen, "Position closed");
 
@@ -439,26 +439,26 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         require(currentPrice > 0, "Invalid price");
 
         // Calculate PnL
-        pnl = _calculatePnL(
+        pnl = uint256(_calculatePnL(
             position,
-            currentPrice
-        );
+            int256(currentPrice)
+        ));
 
         // Calculate tokens to swap
         uint256 tokensToSwap = position.isLong ?
-            (position.positionSize * 1e18) / position.entryPrice :
-            (position.positionSize * position.entryPrice) / 1e18;
+            (position.positionSize * 1e18) / uint256(position.entryPrice) :
+            (position.positionSize * uint256(position.entryPrice)) / 1e18;
 
         // EFFECTS
         position.isOpen = false;
         position.closePrice = currentPrice;
-        position.pnl = pnl;
+        position.pnl = int256(pnl);
 
         // Update account position
         accountContract.closePosition(
             accountId,
-            positionId,
-            pnl
+            position.positionId,
+            int256(pnl)
         );
 
         // INTERACTIONS
@@ -476,9 +476,10 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
         emit PositionClosed(
             msg.sender,
-            positionId,
-            currentPrice,
-            pnl
+            pair,
+            int256(pnl),
+            pnl,
+            0
         );
     }
 
@@ -605,7 +606,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         emit AddressCircuitBreakerToggled(target, addressCircuitBreaker[target]);
     }
 
-    function _calculatePnL(Position storage position, uint256 currentPrice) internal view returns (int256 pnl) {
+    function _calculatePnL(Position storage position, int256 currentPrice) internal view returns (int256 pnl) {
         if (position.isLong) {
             pnl = int256((currentPrice - position.entryPrice) * int256(position.collateral) / position.entryPrice);
         } else {

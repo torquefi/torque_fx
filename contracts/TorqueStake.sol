@@ -220,9 +220,30 @@ contract TorqueStake is OApp, ReentrancyGuard {
     /**
      * @dev Handle incoming cross-chain stake requests
      */
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) internal override {
+        require(supportedChainIds[uint16(_origin.srcEid)], "Chain not supported");
+        require(stakeAddresses[uint16(_origin.srcEid)] == address(uint160(uint256(bytes32(_origin.sender)))), "Invalid stake contract");
 
+        bytes32 messageId = keccak256(abi.encodePacked(_origin.srcEid, _origin.sender, _guid));
+        require(!processedMessages[messageId], "Message already processed");
+        processedMessages[messageId] = true;
 
+        CrossChainStakeRequest memory request = abi.decode(_message, (CrossChainStakeRequest));
+        request.sourceChainId = uint16(_origin.srcEid);
 
+        // Process cross-chain stake request
+        if (request.isStake) {
+            _processCrossChainStake(request);
+        } else {
+            _processCrossChainUnstake(request);
+        }
+    }
 
     /**
      * @dev Send cross-chain stake request
@@ -255,9 +276,9 @@ contract TorqueStake is OApp, ReentrancyGuard {
         _lzSend(
             dstChainId,
             payload,
-            payable(msg.sender),
-            address(0),
-            adapterParams
+            adapterParams,
+            MessagingFee(0, 0),
+            payable(msg.sender)
         );
     }
 
@@ -649,31 +670,6 @@ contract TorqueStake is OApp, ReentrancyGuard {
         torqApr = _calculateAPR(torqStake.lockDuration);
 
         userVotePower = votePower[user];
-    }
-
-    function _lzReceive(
-        Origin calldata _origin,
-        bytes32 _guid,
-        bytes calldata _message,
-        address _executor,
-        bytes calldata _extraData
-    ) internal override {
-        require(supportedChainIds[_origin.srcEid], "Chain not supported");
-        require(stakeAddresses[_origin.srcEid] == address(uint160(uint256(bytes32(_origin.sender)))), "Invalid stake contract");
-
-        bytes32 messageId = keccak256(abi.encodePacked(_origin.srcEid, _origin.sender, _guid));
-        require(!processedMessages[messageId], "Message already processed");
-        processedMessages[messageId] = true;
-
-        CrossChainStakeRequest memory request = abi.decode(_message, (CrossChainStakeRequest));
-        request.sourceChainId = _origin.srcEid;
-
-        // Process cross-chain stake request
-        if (request.isStake) {
-            _processCrossChainStake(request);
-        } else {
-            _processCrossChainUnstake(request);
-        }
     }
 
     function _processCrossChainStake(CrossChainStakeRequest memory request) internal {
