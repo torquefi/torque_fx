@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -23,7 +23,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     bool public defaultIsStablePair = false;
     
     // Cross-chain DEX addresses
-    mapping(uint16 => address) public dexAddresses; // chainId => DEX address on that chain
+    mapping(uint16 => address) public dexAddresses;
     mapping(uint16 => bool) public supportedChainIds;
     
     // Pool structure
@@ -42,7 +42,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint256 currentSqrtPriceX96;
     }
     
-    // Concentrated liquidity parameters
     struct Tick {
         uint256 liquidityNet;
         uint256 liquidityGross;
@@ -58,7 +57,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint256 amount1;
     }
 
-    // Cross-chain liquidity request
     struct CrossChainLiquidityRequest {
         address user;
         address baseToken;
@@ -140,7 +138,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     error TorqueDEX__UnsupportedChain();
     error TorqueDEX__CrossChainLiquidityFailed();
 
-    constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) {}
+    constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) Ownable(_owner) {}
 
     /**
      * @dev Set the default quote asset (e.g., TUSD)
@@ -705,7 +703,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             return;
         }
 
-        // This would need more complex logic to handle specific user ranges
+        // This will need more complex logic to handle specific user ranges
         // For now, we'll emit the event
         emit CrossChainLiquidityCompleted(
             request.user,

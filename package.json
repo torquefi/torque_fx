@@ -20,7 +20,7 @@
     "fx"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0",
   "description": "Cross-chain DeFi protocol for synthetic assets with batch minting capabilities",
   "devDependencies": {
     "@layerzerolabs/devtools-evm": "^2.0.0",

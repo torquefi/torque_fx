@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -47,13 +47,11 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
 
     constructor(address lzEndpoint) OFTCore(18, lzEndpoint, msg.sender) Ownable(msg.sender) {}
 
-    // Abstract functions to be implemented by currency-specific engines
     function getCollateralToken() public view virtual returns (IERC20);
     function getPriceFeed() public view virtual returns (AggregatorV3Interface);
     function getTorqueToken() public view virtual returns (IERC20);
     function getCollateralDecimals() public view virtual returns (uint8);
 
-    // Core functions
     function depositCollateral(uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant {
         // CHECKS
         require(amountCollateral > 0, "Amount must be greater than 0");
@@ -112,7 +110,6 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
         emit CollateralRedeemed(from, to, amountCollateral);
     }
 
-    // View functions
     function getCollateralBalanceOfUser(address user) external view returns (uint256) {
         return s_collateralDeposited[user];
     }
@@ -148,7 +145,6 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
         return (totalTorqueMinted, collateralValueInUsd);
     }
 
-    // Admin functions
     function setTreasuryAddress(address _treasuryAddress) external onlyOwner {
         require(_treasuryAddress != address(0), "Invalid treasury address");
         treasuryAddress = _treasuryAddress;
@@ -169,4 +165,4 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     function mintTorque(uint256 amountToMint, address to) external onlyOwner {
         _mintTorque(amountToMint, to);
     }
-} 
+}

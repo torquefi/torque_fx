@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -552,10 +552,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
     function _checkCircuitBreaker() internal view {
         require(!circuitBreaker, "Circuit breaker active");
-    }
-
-    function _checkTradingLimits(address user, uint256 notionalValue) internal {
-        // Removed daily volume limit check
     }
 
     function getLatestPrice(bytes32 pair) public view returns (int256) {

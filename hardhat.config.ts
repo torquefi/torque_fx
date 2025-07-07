@@ -10,8 +10,16 @@ import { EndpointId } from '@layerzerolabs/lz-definitions';
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
-      { version: "0.8.20" },
-      { version: "0.8.28" }
+      { 
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          viaIR: true
+        }
+      }
     ]
   },
   namedAccounts: {

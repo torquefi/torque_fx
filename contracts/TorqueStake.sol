@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -17,10 +17,10 @@ contract TorqueStake is OApp, ReentrancyGuard {
 
     // Cross-chain staking parameters
     mapping(uint16 => bool) public supportedChainIds;
-    mapping(uint16 => address) public stakeAddresses; // chainId => stake contract address
-    mapping(uint16 => mapping(address => uint256)) public crossChainStakes; // chainId => user => total staked
-    mapping(address => uint256) public totalCrossChainStakes; // user => total staked across all chains
-    mapping(bytes32 => bool) public processedMessages; // Added for cross-chain message replay protection
+    mapping(uint16 => address) public stakeAddresses;
+    mapping(uint16 => mapping(address => uint256)) public crossChainStakes;
+    mapping(address => uint256) public totalCrossChainStakes;
+    mapping(bytes32 => bool) public processedMessages;
 
     // Cross-chain stake request
     struct CrossChainStakeRequest {
@@ -36,7 +36,7 @@ contract TorqueStake is OApp, ReentrancyGuard {
     uint256 public constant MIN_LOCK_DURATION = 7 days;
     uint256 public constant MAX_LOCK_DURATION = 7 * 365 days; // 7 years
     uint256 public constant EARLY_EXIT_PENALTY = 5000; // 50% in basis points
-    uint256 public constant VOTE_POWER_MULTIPLIER = 2; // 2x vote power for max lock
+    uint256 public constant VOTE_POWER_MULTIPLIER = 2e18; // 2x vote power for max lock
 
     // APR parameters (in basis points)
     uint256 public constant MIN_APR = 2000; // 20%
@@ -49,7 +49,7 @@ contract TorqueStake is OApp, ReentrancyGuard {
         uint256 lockEnd;
         uint256 lastRewardTime;
         uint256 accumulatedRewards;
-        uint256 lockDuration; // Store original lock duration for APR calculation
+        uint256 lockDuration;
     }
 
     mapping(address => Stake) public lpStakes;
@@ -736,4 +736,4 @@ contract TorqueStake is OApp, ReentrancyGuard {
     ) external onlyOwner {
         IERC20(token).transfer(to, amount);
     }
-} 
+}

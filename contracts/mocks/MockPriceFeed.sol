@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
@@ -12,7 +12,7 @@ contract MockPriceFeed is AggregatorV3Interface {
 
     constructor() {
         _decimals = 8;
-        _price = 2000 * 10**8; // $2000
+        _price = 2000 * 10**8; // $2,000
         _roundId = 1;
         _timestamp = block.timestamp;
         _answeredInRound = 1;

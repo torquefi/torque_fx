@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -64,7 +64,7 @@ contract TorqueAccountBundler is Ownable, ReentrancyGuard {
         uint256 accountId,
         uint256[] calldata amounts,
         bool[] calldata isETH
-    ) external nonReentrant {
+    ) external payable nonReentrant {
         require(amounts.length == isETH.length, "Length mismatch");
         require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
 

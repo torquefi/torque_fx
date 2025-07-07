@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -50,12 +50,12 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
     uint16 public constant OPTIMISM_CHAIN_ID = 10;
     uint16 public constant POLYGON_CHAIN_ID = 137;
     uint16 public constant BASE_CHAIN_ID = 8453;
-    uint16 public constant SONIC_CHAIN_ID = 146; // Sonic blockchain
-    uint16 public constant ABSTRACT_CHAIN_ID = 2741; // Abstract blockchain
-    uint16 public constant BSC_CHAIN_ID = 56; // BSC blockchain
-    uint16 public constant HYPEREVM_CHAIN_ID = 999; // HyperEVM blockchain
-    uint16 public constant FRAXTAL_CHAIN_ID = 252; // Fraxtal blockchain
-    uint16 public constant AVALANCHE_CHAIN_ID = 43114; // Avalanche blockchain
+    uint16 public constant SONIC_CHAIN_ID = 146;
+    uint16 public constant ABSTRACT_CHAIN_ID = 2741;
+    uint16 public constant BSC_CHAIN_ID = 56;
+    uint16 public constant HYPEREVM_CHAIN_ID = 999;
+    uint16 public constant FRAXTAL_CHAIN_ID = 252;
+    uint16 public constant AVALANCHE_CHAIN_ID = 43114;
     
     // Chain validation
     mapping(uint16 => bool) public supportedChainIds;
@@ -71,7 +71,6 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
         address _lzEndpoint,
         address _owner
     ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
-        // Initialize supported chain IDs
         supportedChainIds[ETHEREUM_CHAIN_ID] = true;
         supportedChainIds[ARBITRUM_CHAIN_ID] = true;
         supportedChainIds[OPTIMISM_CHAIN_ID] = true;
@@ -274,12 +273,10 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
         uint16 dstChainId,
         bytes calldata adapterParams
     ) internal view returns (uint256) {
-        // This would integrate with LayerZero's gas estimation
+        // This will integrate with LayerZero's gas estimation
         // For now, return a conservative estimate
-        return 100000; // Conservative estimate per message
+        return 100000;
     }
-    
-    // Admin functions
     
     /**
      * @dev Set engine address for a currency and chain
@@ -343,4 +340,4 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
         chainIds[10] = AVALANCHE_CHAIN_ID;
         return chainIds;
     }
-} 
+}
