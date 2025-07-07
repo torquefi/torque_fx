@@ -48,8 +48,8 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         address referrer;
         uint256 lastDepositTime;
         uint256 lastWithdrawTime;
-        uint256[] openPositions; // Track open position IDs
-        uint256 nonce; // Added for gas optimization
+        uint256[] openPositions;
+        uint256 nonce;
     }
 
     struct Position {
@@ -70,7 +70,6 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
         bool isETH;
     }
 
-    // Define UserOperation struct locally
     struct UserOperation {
         address sender;
         uint256 nonce;
@@ -101,7 +100,7 @@ contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp 
     mapping(address => mapping(uint256 => Position[])) public userPositions;
     mapping(address => mapping(uint256 => uint256)) public totalExposure;
     mapping(address => mapping(uint256 => uint256)) public totalCollateral;
-    mapping(bytes32 => bool) public processedMessages; // Added for cross-chain message replay protection
+    mapping(bytes32 => bool) public processedMessages;
 
     uint256 public constant MAX_ACCOUNTS = 5;
     uint256 public constant MIN_LEVERAGE = 1;
