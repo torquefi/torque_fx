@@ -20,6 +20,12 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - **Leveraged Trading**: Open long/short positions with up to 100x leverage
 - **Account System**: Create multiple accounts with custom leverage and referral tracking
 - **Risk Management**: Circuit breaker, position size limits, and liquidation incentives
+- **Multi-Currency Payments**: Accept payments in any Torque currency (TUSD, TEUR, TGBP, etc.)
+- **Cross-Chain Payments**: Seamless cross-chain payment settlement via LayerZero
+- **Mass Payments**: Bulk payment processing for contractors and freelancers
+- **Buy Now Pay Later**: Flexible installment payment options with configurable terms
+- **Merchant Dashboard**: Comprehensive analytics, reporting, and merchant management
+- **Donations**: Multi-currency donation system with analytics and transparency
 - **Rewards**: Stake, earn, and claim rewards via TorqueRewards
 
 ## Architecture
@@ -32,6 +38,9 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `TorqueLP.sol`: LP token contract for DEX liquidity positions
 - `TorqueRouter.sol`: Trading pair and price feed management
 - `TorqueFX.sol`: Main leveraged trading contract
+- `TorquePayments.sol`: Multi-currency payment system with Torque currencies
+- `TorqueGateway.sol`: Merchant payment gateway integration
+- `TorqueMerchant.sol`: Merchant analytics and management dashboard
 - `4337/`: ERC-4337 account abstraction contracts
   - `TorqueAccount.sol`: User account and leverage management
   - `TorqueAccountFactory.sol`: Account creation and management
@@ -64,6 +73,9 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 | TorqueLP         | `0x...`          | `0x...`           |
 | TorqueRouter     | `0x...`          | `0x...`           |
 | TorqueStake      | `0x...`          | `0x...`           |
+| TorquePayments    | `0x...`          | `0x...`           |
+| TorqueGateway | `0x...`      | `0x...`           |
+| TorqueMerchant | `0x...`  | `0x...`           |
 | TorqueRewards    | `0x...`          | `0x...`           |
 | TorqueAccount    | `0x...`          | `0x...`           |
 | TorqueAccountFactory | `0x...`      | `0x...`           |

@@ -5,32 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "./4337/TorqueAccount.sol";
-
-interface ITorqueAccount {
-    function getLeverage(address user, uint256 accountId) external view returns (uint256);
-    function userAccounts(address user, uint256 accountId) external view returns (
-        uint256 leverage, bool exists, bool active, string memory username, address referrer
-    );
-    function isValidAccount(address user, uint256 accountId) external view returns (bool);
-    function openPosition(
-        uint256 accountId,
-        uint256 positionId,
-        address baseToken,
-        address quoteToken,
-        uint256 collateral,
-        uint256 positionSize,
-        uint256 entryPrice,
-        bool isLong
-    ) external;
-    function closePosition(
-        uint256 accountId,
-        uint256 positionId,
-        int256 pnl
-    ) external;
-}
-
-// ITorqueDEX interface is already defined in TorqueAccount.sol
+import "./interfaces/ITorqueAccount.sol";
+import "./interfaces/ITorqueDEX.sol";
 
 contract TorqueFX is Ownable, ReentrancyGuard {
     enum OrderType { MARKET, LIMIT, STOP_LOSS, TAKE_PROFIT }

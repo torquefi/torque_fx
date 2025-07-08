@@ -11,30 +11,7 @@ import "@account-abstraction/contracts/core/BaseAccount.sol";
 import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import "@account-abstraction/contracts/core/UserOperationLib.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
-
-interface ITorqueDEX {
-    function depositLiquidity(address token, uint256 amount) external;
-    function withdrawLiquidity(address token, uint256 amount) external;
-    function openPosition(
-        address user,
-        address baseToken,
-        address quoteToken,
-        uint256 baseAmount,
-        uint256 leverage
-    ) external returns (uint256 positionId);
-    function closePosition(uint256 positionId) external;
-    function getPosition(uint256 positionId) external view returns (
-        address user,
-        address baseToken,
-        address quoteToken,
-        uint256 baseAmount,
-        uint256 leverage,
-        uint256 entryPrice,
-        uint256 currentPrice
-    );
-    function swap(address tokenIn, uint256 amountIn, uint256 accountId) external returns (uint256 amountOut);
-    function getPrice(address baseToken, address quoteToken) external view returns (uint256 price);
-}
+import "../interfaces/ITorqueDEX.sol";
 
 contract TorqueAccount is BaseAccount, Ownable, ReentrancyGuard, Pausable, OApp {
     using SafeERC20 for IERC20;

@@ -3,22 +3,7 @@ pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "./4337/TorqueAccount.sol";
-
-interface ITorqueAccount {
-    function userAccounts(address user, uint256 accountId) external view returns (
-        uint256 leverage,
-        bool exists,
-        bool active,
-        string memory username,
-        address referrer,
-        uint256 lastDepositTime,
-        uint256 lastWithdrawTime,
-        uint256[] memory openPositions,
-        uint256 nonce
-    );
-    function isValidAccount(address user, uint256 accountId) external view returns (bool);
-}
+import "./interfaces/ITorqueAccount.sol";
 
 contract TorqueRouter is Ownable {
     struct Pair {
@@ -95,7 +80,7 @@ contract TorqueRouter is Ownable {
     }
 
     function isValidAccount(address user, uint256 accountId) public view returns (bool) {
-        (, bool exists, bool active, , , , , , ) = torqueAccount.userAccounts(user, accountId);
+        (, bool exists, bool active, , ) = torqueAccount.userAccounts(user, accountId);
         return exists && active;
     }
 }

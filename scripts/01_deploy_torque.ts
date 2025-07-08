@@ -26,10 +26,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Deploy TorqueDEX (main DEX contract with pool management)
   console.log('\n2. Deploying TorqueDEX...');
-  const defaultFeeRecipient = deployer; // Can be changed later
   const torqueDEX = await deploy('TorqueDEX', {
     from: deployer,
-    args: [lzEndpoint, deployer, defaultFeeRecipient],
+    args: [lzEndpoint, deployer],
     log: true,
     waitConfirmations: 1,
   });
@@ -38,7 +37,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Set TUSD token in DEX
   console.log('\n3. Setting TUSD token in DEX...');
   const dexContract = await ethers.getContractAt('TorqueDEX', torqueDEX.address);
-  const setTUSDTx = await dexContract.setTUSDToken(torqueUSD.address);
+  const setTUSDTx = await dexContract.setDefaultQuoteAsset(torqueUSD.address);
   await setTUSDTx.wait();
   console.log('TUSD token set in DEX');
 
@@ -143,18 +142,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
   console.log(`TorqueStake deployed to: ${torqueStake.address}`);
 
-  // Deploy TorqueRewards
-  console.log('\n10. Deploying TorqueRewards...');
-  const torqueRewards = await deploy('TorqueRewards', {
-    from: deployer,
-    args: [torqueUSD.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueRewards deployed to: ${torqueRewards.address}`);
-
   // Deploy TorqueBatchMinter
-  console.log('\n11. Deploying TorqueBatchMinter...');
+  console.log('\n10. Deploying TorqueBatchMinter...');
   const torqueBatchMinter = await deploy('TorqueBatchMinter', {
     from: deployer,
     args: [lzEndpoint, deployer],
@@ -164,7 +153,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`TorqueBatchMinter deployed to: ${torqueBatchMinter.address}`);
 
   // Deploy 4337 contracts
-  console.log('\n12. Deploying 4337 contracts...');
+  console.log('\n11. Deploying 4337 contracts...');
   
   // EntryPoint
   const entryPoint = await deploy('EntryPoint', {
@@ -238,6 +227,79 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
   console.log(`TorqueAccountUpgrade deployed to: ${torqueAccountUpgrade.address}`);
 
+  // Deploy TorqueFX (main trading contract) - after TorqueAccount is deployed
+  console.log('\n13. Deploying TorqueFX...');
+  const torqueFX = await deploy('TorqueFX', {
+    from: deployer,
+    args: [torqueAccount.address, torqueDEX.address, torqueUSD.address],
+    log: true,
+    waitConfirmations: 1,
+  });
+  console.log(`TorqueFX deployed to: ${torqueFX.address}`);
+
+  // Deploy TorquePayments (after TorqueAccount is deployed)
+  console.log('\n14. Deploying TorquePayments...');
+  const torquePayments = await deploy('TorquePayments', {
+    from: deployer,
+    args: [torqueAccount.address, torqueUSD.address, lzEndpoint],
+    log: true,
+    waitConfirmations: 1,
+  });
+  console.log(`TorquePayments deployed to: ${torquePayments.address}`);
+
+  // Set up supported Torque currencies
+  console.log('\n15. Setting up supported Torque currencies...');
+  const paymentsContract = await ethers.getContractAt('TorquePayments', torquePayments.address);
+  
+  // Add all Torque currencies as supported
+  const allTorqueCurrencies = [
+    { address: torqueUSD.address, symbol: 'TUSD' },
+    ...deployedCurrencies.map(currency => ({
+      address: currency.address,
+      symbol: currency.symbol
+    }))
+  ];
+
+  for (const currency of allTorqueCurrencies) {
+    try {
+      const setCurrencyTx = await paymentsContract.setSupportedTorqueCurrency(currency.address, true);
+      await setCurrencyTx.wait();
+      console.log(`✅ ${currency.symbol} added as supported currency`);
+    } catch (error: any) {
+      console.log(`⚠️  Failed to add ${currency.symbol}:`, error?.message || 'Unknown error');
+    }
+  }
+
+  // Deploy TorqueGateway
+  console.log('\n16. Deploying TorqueGateway...');
+      const torqueGateway = await deploy('TorqueGateway', {
+    from: deployer,
+    args: [torquePayments.address, lzEndpoint, deployer],
+    log: true,
+    waitConfirmations: 1,
+  });
+  console.log(`TorqueGateway deployed to: ${torqueGateway.address}`);
+
+  // Deploy TorqueMerchant
+  console.log('\n17. Deploying TorqueMerchant...');
+  const torqueMerchant = await deploy('TorqueMerchant', {
+    from: deployer,
+    args: [torquePayments.address, torqueGateway.address],
+    log: true,
+    waitConfirmations: 1,
+  });
+  console.log(`TorqueMerchant deployed to: ${torqueMerchant.address}`);
+
+  // Deploy TorqueRewards (updated with new dependencies)
+  console.log('\n18. Deploying TorqueRewards...');
+  const torqueRewards = await deploy('TorqueRewards', {
+    from: deployer,
+    args: [torqueUSD.address, torqueAccount.address, torquePayments.address, torqueFX.address],
+    log: true,
+    waitConfirmations: 1,
+  });
+  console.log(`TorqueRewards deployed to: ${torqueRewards.address}`);
+
   console.log('\n✅ All contracts deployed successfully!');
   console.log('\n📋 Deployment Summary:');
   console.log(`Network: ${network.name}`);
@@ -249,6 +311,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`  Torque: ${torque.address}`);
   console.log(`  TorqueRouter: ${torqueRouter.address}`);
   console.log(`  TorqueStake: ${torqueStake.address}`);
+  console.log(`  TorqueFX: ${torqueFX.address}`);
+  console.log(`  TorquePayments: ${torquePayments.address}`);
+  console.log(`  TorqueGateway: ${torqueGateway.address}`);
+  console.log(`  TorqueMerchant: ${torqueMerchant.address}`);
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
   console.log(`  TorqueBatchMinter: ${torqueBatchMinter.address}`);
   console.log(`\n4337 Contracts:`);
@@ -280,6 +346,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       torque: torque.address,
       torqueRouter: torqueRouter.address,
       torqueStake: torqueStake.address,
+      torqueFX: torqueFX.address,
+      torquePayments: torquePayments.address,
+      torqueGateway: torqueGateway.address,
+      torqueMerchant: torqueMerchant.address,
       torqueRewards: torqueRewards.address,
       torqueBatchMinter: torqueBatchMinter.address,
       entryPoint: entryPoint.address,

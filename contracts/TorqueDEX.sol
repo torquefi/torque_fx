@@ -138,7 +138,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     error TorqueDEX__UnsupportedChain();
     error TorqueDEX__CrossChainLiquidityFailed();
 
-    constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) Ownable(_owner) {}
+    constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) Ownable(_owner) ReentrancyGuard() {}
 
     /**
      * @dev Set the default quote asset (e.g., TUSD)
