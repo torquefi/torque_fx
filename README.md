@@ -17,10 +17,8 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 ## Features
 
 - **fxAMM DEX**: Swap tokens and provide liquidity via TorqueDEX pools
-- **Leveraged Trading**: Open long/short positions with up to 100x leverage
-- **Account System**: Create multiple accounts with custom leverage and referral tracking
-- **Risk Management**: Circuit breaker, position size limits, and liquidation incentives
-- **Multi-Currency Payments**: Accept payments in any Torque currency (TUSD, TEUR, TGBP, etc.)
+- **Leveraged Trading**: Open long/short positions with up to 500x leverage using direct wallet connection
+- **Liquidity Provision**: Provide DEX liquidity across stable and concentrated pools
 - **Cross-Chain Payments**: Seamless cross-chain payment settlement via LayerZero
 - **Mass Payments**: Bulk payment processing for contractors and freelancers
 - **Buy Now Pay Later**: Flexible installment payment options with configurable terms
@@ -31,72 +29,69 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 ## Architecture
 
 - `Torque.sol`: Native ERC20 token with voting and omnichain support
-- `TorqueDEX.sol`: Native AMM with concentrated and stable liquidity models
-- `TorqueStake.sol`: Staking contract for LP and TORQ tokens with lock periods
-- `TorqueBatchMinter.sol`: Batch minting for multiple destination chains
-- `TorqueRewards.sol`: Trading rewards distribution (referral and cashback)
+- `TorqueDEX.sol`: AMM with concentrated and stable liquidity models
 - `TorqueLP.sol`: LP token contract for DEX liquidity positions
 - `TorqueRouter.sol`: Trading pair and price feed management
-- `TorqueFX.sol`: Main leveraged trading contract
-- `TorquePayments.sol`: Multi-currency payment system with Torque currencies
-- `TorqueGateway.sol`: Merchant payment gateway integration
+- `TorqueStake.sol`: Staking for LP and TORQ tokens with lock periods
+- `TorqueBatchMinter.sol`: Batch minting for multiple destination chains
+- `TorqueRewards.sol`: Flow-based rewards distribution (referral and cashback)
+- `TorqueFX.sol`: Margin trading extension utilizing the DEX spot liquidity
+- `TorquePayments.sol`: Multi-currency payments with Torque currencies
 - `TorqueMerchant.sol`: Merchant analytics and management dashboard
-- `4337/`: ERC-4337 account abstraction contracts
-  - `TorqueAccount.sol`: User account and leverage management
-  - `TorqueAccountFactory.sol`: Account creation and management
-  - `TorqueAccountBundler.sol`: Operation bundling and execution
-  - `TorqueAccountRecovery.sol`: Account recovery and guardian management
-  - `TorqueAccountUpgrade.sol`: Account upgrades and leverage changes
-  - `TorqueAccountGasOptimizer.sol`: Gas optimization for operations
-  - `TorqueAccountCrossChain.sol`: Cross-chain account operations
-  - `EntryPoint.sol`: ERC-4337 entry point contract
+- `TorqueGateway.sol`: Merchant payment gateway integration
 - `currencies/`: Currency-specific contracts
 - `engines/`: Currency-specific engines
 
+## Configuration System
+
+The project includes a comprehensive configuration system for managing networks, collateral, and contract addresses across multiple chains.
+
+### Quick Start
+
+```typescript
+import { 
+  getNetworkInfo, 
+  getSupportedCollateralsForNetwork,
+  getContractAddress 
+} from './config';
+
+// Get network information
+const ethereumInfo = getNetworkInfo('ethereum');
+
+// Get supported collaterals
+const collaterals = getSupportedCollateralsForNetwork('arbitrum');
+
+// Get contract addresses
+const routerAddress = getContractAddress('ethereum', 'torqueRouter');
+```
+
+### Supported Networks
+
+- **Mainnet**: Ethereum, Arbitrum, Optimism, Polygon, Base, BSC, Avalanche, Sonic, Abstract, HyperEVM, Fraxtal
+- **Testnet**: Sepolia, Arbitrum Sepolia, Optimism Sepolia, Polygon Mumbai, Base Goerli
+
+### Supported Collaterals
+
+- **Stablecoins**: USDC, USDT, USDS, WYST, etc.
+- **Other Assets**: cbBTC, cbETH, WETH, WBTC, LINK, etc.
+
+For detailed configuration docs, see [`docs/config.md`](docs/config.md).
+
 ## Contract Addresses
 
-| Contract         | Address (Mainnet) | Address (Testnet) |
-|------------------|------------------|-------------------|
-| Torque           | `0x...`          | `0x...`           |
-| TorqueUSD        | `0x...`          | `0x...`           |
-| TorqueEUR        | `0x...`          | `0x...`           |
-| TorqueGBP        | `0x...`          | `0x...`           |
-| TorqueJPY        | `0x...`          | `0x...`           |
-| TorqueAUD        | `0x...`          | `0x...`           |
-| TorqueCAD        | `0x...`          | `0x...`           |
-| TorqueCHF        | `0x...`          | `0x...`           |
-| TorqueNZD        | `0x...`          | `0x...`           |
-| TorqueXAU        | `0x...`          | `0x...`           |
-| TorqueXAG        | `0x...`          | `0x...`           |
-| TorqueFX         | `0x...`          | `0x...`           |
-| TorqueDEX        | `0x...`          | `0x...`           |
-| TorqueLP         | `0x...`          | `0x...`           |
-| TorqueRouter     | `0x...`          | `0x...`           |
-| TorqueStake      | `0x...`          | `0x...`           |
-| TorquePayments    | `0x...`          | `0x...`           |
-| TorqueGateway | `0x...`      | `0x...`           |
-| TorqueMerchant | `0x...`  | `0x...`           |
-| TorqueRewards    | `0x...`          | `0x...`           |
-| TorqueAccount    | `0x...`          | `0x...`           |
-| TorqueAccountFactory | `0x...`      | `0x...`           |
-| TorqueAccountBundler | `0x...`      | `0x...`           |
-| TorqueAccountRecovery | `0x...`    | `0x...`           |
-| TorqueAccountUpgrade | `0x...`      | `0x...`           |
-| TorqueAccountGasOptimizer | `0x...` | `0x...`           |
-| TorqueAccountCrossChain | `0x...`  | `0x...`           |
-| EntryPoint       | `0x...`          | `0x...`           |
-| TorqueUSDEngine  | `0x...`          | `0x...`           |
-| TorqueEUREngine  | `0x...`          | `0x...`           |
-| TorqueGBPEngine  | `0x...`          | `0x...`           |
-| TorqueJPYEngine  | `0x...`          | `0x...`           |
-| TorqueAUDEngine  | `0x...`          | `0x...`           |
-| TorqueCADEngine  | `0x...`          | `0x...`           |
-| TorqueCHFEngine  | `0x...`          | `0x...`           |
-| TorqueNZDEngine  | `0x...`          | `0x...`           |
-| TorqueXAUEngine  | `0x...`          | `0x...`           |
-| TorqueXAGEngine  | `0x...`          | `0x...`           |
-| TorqueBatchMinter | `0x...`          | `0x...`           |
-| Treasury         | `0x...`          | `0x...`           |
+Contract addresses are managed through the configuration system. Use the utility functions to access addresses:
+
+```typescript
+import { getContractAddress, getEngineAddress } from './config';
+
+// Get specific contract address
+const routerAddress = getContractAddress('ethereum', 'torqueRouter');
+
+// Get engine address for a currency
+const usdEngine = getEngineAddress('arbitrum', 'USD');
+```
+
+For the latest deployed addresses, check the configuration files in the `config/` directory.
 
 ## Getting Started
 
@@ -124,7 +119,10 @@ npx hardhat compile
 npx hardhat test
 
 # Deploy contracts
-npx hardhat run scripts/deploy.ts --network <network-name>
+npx hardhat run scripts/01_deploy_torque.ts --network <network-name>
+
+# Link contracts
+npx hardhat run scripts/02_link_contracts.ts --network <network-name>
 ```
 
 ## Testing
@@ -137,4 +135,4 @@ npx hardhat test
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0. See the LICENSE file for details.
+This project is licensed under the GNU General Public License v3.0.

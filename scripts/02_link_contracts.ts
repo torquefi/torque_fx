@@ -18,14 +18,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const torqueStake = await get('TorqueStake');
   const torqueRewards = await get('TorqueRewards');
   const torqueBatchMinter = await get('TorqueBatchMinter');
-  const entryPoint = await get('EntryPoint');
-  const torqueAccountFactory = await get('TorqueAccountFactory');
-  const torqueAccount = await get('TorqueAccount');
-  const torqueAccountBundler = await get('TorqueAccountBundler');
-  const torqueAccountCrossChain = await get('TorqueAccountCrossChain');
-  const torqueAccountGasOptimizer = await get('TorqueAccountGasOptimizer');
-  const torqueAccountRecovery = await get('TorqueAccountRecovery');
-  const torqueAccountUpgrade = await get('TorqueAccountUpgrade');
+  const torqueFX = await get('TorqueFX');
+  const torquePayments = await get('TorquePayments');
+  const torqueGateway = await get('TorqueGateway');
 
   // Get currency contracts
   const currencies = [
@@ -116,20 +111,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   }
 
-  // Link TorqueAccountFactory with EntryPoint and TorqueAccount
-  console.log('\n3. Linking TorqueAccountFactory...');
-  const accountFactoryContract = await ethers.getContractAt('TorqueAccountFactory', torqueAccountFactory.address);
-
-  try {
-    const setImplementationTx = await accountFactoryContract.setImplementation(torqueAccount.address);
-    await setImplementationTx.wait();
-    console.log('✅ TorqueAccountFactory linked with TorqueAccount implementation');
-  } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueAccountFactory:', error?.message || 'Unknown error');
-  }
-
   // Link TorqueStake with TorqueUSD
-  console.log('\n4. Linking TorqueStake...');
+  console.log('\n3. Linking TorqueStake...');
   const stakeContract = await ethers.getContractAt('TorqueStake', torqueStake.address);
 
   try {
@@ -141,7 +124,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   // Link TorqueRewards with TorqueUSD
-  console.log('\n5. Linking TorqueRewards...');
+  console.log('\n4. Linking TorqueRewards...');
   const rewardsContract = await ethers.getContractAt('TorqueRewards', torqueRewards.address);
 
   try {
@@ -153,7 +136,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   // Link TorqueRouter with TorqueDEX
-  console.log('\n6. Linking TorqueRouter...');
+  console.log('\n5. Linking TorqueRouter...');
   const routerContract = await ethers.getContractAt('TorqueRouter', torqueRouter.address);
 
   try {
@@ -164,57 +147,51 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log('⚠️  Failed to link TorqueRouter:', error?.message || 'Unknown error');
   }
 
-  // Link 4337 contracts
-  console.log('\n7. Linking 4337 contracts...');
-  
-  // Link TorqueAccountBundler with EntryPoint
-  const bundlerContract = await ethers.getContractAt('TorqueAccountBundler', torqueAccountBundler.address);
+  // Link TorqueFX with TorqueDEX
+  console.log('\n6. Linking TorqueFX...');
+  const fxContract = await ethers.getContractAt('TorqueFX', torqueFX.address);
+
   try {
-    const setEntryPointTx = await bundlerContract.setEntryPoint(entryPoint.address);
-    await setEntryPointTx.wait();
-    console.log('✅ TorqueAccountBundler linked with EntryPoint');
+    const setDEXTx = await fxContract.setDEXPool(ethers.keccak256(ethers.toUtf8Bytes("ETH/USD")), torqueDEX.address);
+    await setDEXTx.wait();
+    console.log('✅ TorqueFX linked with TorqueDEX');
   } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueAccountBundler:', error?.message || 'Unknown error');
+    console.log('⚠️  Failed to link TorqueFX:', error?.message || 'Unknown error');
   }
 
-  // Link TorqueAccountCrossChain with TorqueAccount
-  const crossChainContract = await ethers.getContractAt('TorqueAccountCrossChain', torqueAccountCrossChain.address);
-  try {
-    const setAccountTx = await crossChainContract.setAccount(torqueAccount.address);
-    await setAccountTx.wait();
-    console.log('✅ TorqueAccountCrossChain linked with TorqueAccount');
-  } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueAccountCrossChain:', error?.message || 'Unknown error');
+  // Link TorquePayments with TorqueUSD
+  console.log('\n7. Linking TorquePayments...');
+  const paymentsContract = await ethers.getContractAt('TorquePayments', torquePayments.address);
+
+  // Add all Torque currencies as supported
+  const allTorqueCurrencies = [
+    { address: torqueUSD.address, symbol: 'TUSD' },
+    ...currencyContracts.map(currency => ({
+      address: currency.address,
+      symbol: currency.symbol
+    }))
+  ];
+
+  for (const currency of allTorqueCurrencies) {
+    try {
+      const setCurrencyTx = await paymentsContract.setTorqueCurrency(currency.address, true);
+      await setCurrencyTx.wait();
+      console.log(`✅ ${currency.symbol} added as supported currency`);
+    } catch (error: any) {
+      console.log(`⚠️  Failed to add ${currency.symbol}:`, error?.message || 'Unknown error');
+    }
   }
 
-  // Link TorqueAccountGasOptimizer with EntryPoint
-  const gasOptimizerContract = await ethers.getContractAt('TorqueAccountGasOptimizer', torqueAccountGasOptimizer.address);
-  try {
-    const setEntryPointTx = await gasOptimizerContract.setEntryPoint(entryPoint.address);
-    await setEntryPointTx.wait();
-    console.log('✅ TorqueAccountGasOptimizer linked with EntryPoint');
-  } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueAccountGasOptimizer:', error?.message || 'Unknown error');
-  }
+  // Link TorqueGateway with TorquePayments
+  console.log('\n8. Linking TorqueGateway...');
+  const gatewayContract = await ethers.getContractAt('TorqueGateway', torqueGateway.address);
 
-  // Link TorqueAccountRecovery with EntryPoint
-  const recoveryContract = await ethers.getContractAt('TorqueAccountRecovery', torqueAccountRecovery.address);
   try {
-    const setEntryPointTx = await recoveryContract.setEntryPoint(entryPoint.address);
-    await setEntryPointTx.wait();
-    console.log('✅ TorqueAccountRecovery linked with EntryPoint');
+    const setPaymentsTx = await gatewayContract.setPaymentsContract(torquePayments.address);
+    await setPaymentsTx.wait();
+    console.log('✅ TorqueGateway linked with TorquePayments');
   } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueAccountRecovery:', error?.message || 'Unknown error');
-  }
-
-  // Link TorqueAccountUpgrade with EntryPoint
-  const upgradeContract = await ethers.getContractAt('TorqueAccountUpgrade', torqueAccountUpgrade.address);
-  try {
-    const setEntryPointTx = await upgradeContract.setEntryPoint(entryPoint.address);
-    await setEntryPointTx.wait();
-    console.log('✅ TorqueAccountUpgrade linked with EntryPoint');
-  } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueAccountUpgrade:', error?.message || 'Unknown error');
+    console.log('⚠️  Failed to link TorqueGateway:', error?.message || 'Unknown error');
   }
 
   console.log('\n✅ Contract linking completed!');
@@ -224,16 +201,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`\nLinked Contracts:`);
   console.log(`  TorqueDEX: ${torqueDEX.address}`);
   console.log(`  TorqueBatchMinter: ${torqueBatchMinter.address}`);
-  console.log(`  TorqueAccountFactory: ${torqueAccountFactory.address}`);
   console.log(`  TorqueStake: ${torqueStake.address}`);
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
   console.log(`  TorqueRouter: ${torqueRouter.address}`);
-  console.log(`\n4337 Contracts:`);
-  console.log(`  TorqueAccountBundler: ${torqueAccountBundler.address}`);
-  console.log(`  TorqueAccountCrossChain: ${torqueAccountCrossChain.address}`);
-  console.log(`  TorqueAccountGasOptimizer: ${torqueAccountGasOptimizer.address}`);
-  console.log(`  TorqueAccountRecovery: ${torqueAccountRecovery.address}`);
-  console.log(`  TorqueAccountUpgrade: ${torqueAccountUpgrade.address}`);
+  console.log(`  TorqueFX: ${torqueFX.address}`);
+  console.log(`  TorquePayments: ${torquePayments.address}`);
+  console.log(`  TorqueGateway: ${torqueGateway.address}`);
   console.log(`\nCurrency Pools Created:`);
   currencyContracts.forEach(currency => {
     console.log(`  ${currency.symbol}/TUSD pool`);

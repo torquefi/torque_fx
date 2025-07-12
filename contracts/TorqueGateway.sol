@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./TorquePayments.sol";
 import "./interfaces/ITorquePayments.sol";
-import "./interfaces/ITorqueAccount.sol";
 
 contract TorqueGateway is Ownable, ReentrancyGuard, Pausable {
     using ECDSA for bytes32;
@@ -41,7 +40,6 @@ contract TorqueGateway is Ownable, ReentrancyGuard, Pausable {
     }
 
     ITorquePayments public immutable paymentsContract;
-    ITorqueAccount public immutable accountContract;
     IERC20 public immutable usdc;
 
     mapping(address => GatewayConfig) public merchantConfigs;
@@ -85,9 +83,8 @@ contract TorqueGateway is Ownable, ReentrancyGuard, Pausable {
         uint256 fee
     );
 
-    constructor(address _paymentsContract, address _accountContract, address _usdc) Ownable(msg.sender) {
+    constructor(address _paymentsContract, address _usdc) Ownable(msg.sender) {
         paymentsContract = ITorquePayments(_paymentsContract);
-        accountContract = ITorqueAccount(_accountContract);
         usdc = IERC20(_usdc);
     }
 
@@ -135,7 +132,6 @@ contract TorqueGateway is Ownable, ReentrancyGuard, Pausable {
      */
     function processPaymentSession(
         bytes32 sessionId,
-        uint256 accountId,
         bytes calldata signature
     ) external nonReentrant {
         PaymentSession storage session = paymentSessions[sessionId];
@@ -155,14 +151,8 @@ contract TorqueGateway is Ownable, ReentrancyGuard, Pausable {
         address signer = ethSignedMessageHash.recover(signature);
         require(signer == session.customer, "Invalid signature");
 
-        // Verify account if required (optional for merchants)
-        if (merchantConfigs[session.merchant].requireAccountVerification) {
-            require(accountId > 0, "Account ID required");
-            require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
-            // Additional account verification can be added here
-            // e.g., check account age, transaction history, etc.
-        }
-        // If no account verification required, any address can pay (accountId can be 0)
+        // Account verification is now optional and can be handled off-chain
+        // If accountId > 0, it can be used for additional verification logic
 
         // Create payment request
         TorquePayments.PaymentRequest memory request = TorquePayments.PaymentRequest({
@@ -177,10 +167,9 @@ contract TorqueGateway is Ownable, ReentrancyGuard, Pausable {
             metadata: ""
         });
 
-        // Create and process payment (use accountId 0 if not required)
-        uint256 paymentAccountId = merchantConfigs[session.merchant].requireAccountVerification ? accountId : 0;
-        bytes32 paymentId = paymentsContract.createPayment(request, paymentAccountId);
-        paymentsContract.processPayment(paymentId, paymentAccountId);
+        // Create and process payment
+        bytes32 paymentId = paymentsContract.createPayment(request);
+        paymentsContract.processPayment(paymentId);
 
         // Update session
         session.completed = true;

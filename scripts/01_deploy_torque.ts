@@ -152,96 +152,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
   console.log(`TorqueBatchMinter deployed to: ${torqueBatchMinter.address}`);
 
-  // Deploy 4337 contracts
-  console.log('\n11. Deploying 4337 contracts...');
-  
-  // EntryPoint
-  const entryPoint = await deploy('EntryPoint', {
-    from: deployer,
-    args: [],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`EntryPoint deployed to: ${entryPoint.address}`);
-
-  // TorqueAccountFactory
-  const torqueAccountFactory = await deploy('TorqueAccountFactory', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccountFactory deployed to: ${torqueAccountFactory.address}`);
-
-  // TorqueAccount (implementation)
-  const torqueAccount = await deploy('TorqueAccount', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccount deployed to: ${torqueAccount.address}`);
-
-  // TorqueAccountBundler
-  const torqueAccountBundler = await deploy('TorqueAccountBundler', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccountBundler deployed to: ${torqueAccountBundler.address}`);
-
-  // TorqueAccountCrossChain
-  const torqueAccountCrossChain = await deploy('TorqueAccountCrossChain', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccountCrossChain deployed to: ${torqueAccountCrossChain.address}`);
-
-  // TorqueAccountGasOptimizer
-  const torqueAccountGasOptimizer = await deploy('TorqueAccountGasOptimizer', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccountGasOptimizer deployed to: ${torqueAccountGasOptimizer.address}`);
-
-  // TorqueAccountRecovery
-  const torqueAccountRecovery = await deploy('TorqueAccountRecovery', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccountRecovery deployed to: ${torqueAccountRecovery.address}`);
-
-  // TorqueAccountUpgrade
-  const torqueAccountUpgrade = await deploy('TorqueAccountUpgrade', {
-    from: deployer,
-    args: [entryPoint.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueAccountUpgrade deployed to: ${torqueAccountUpgrade.address}`);
-
-  // Deploy TorqueFX (main trading contract) - after TorqueAccount is deployed
-  console.log('\n13. Deploying TorqueFX...');
+  // Deploy TorqueFX (main trading contract)
+  console.log('\n11. Deploying TorqueFX...');
   const torqueFX = await deploy('TorqueFX', {
     from: deployer,
-    args: [torqueAccount.address, torqueDEX.address, torqueUSD.address],
+    args: [torqueDEX.address, torqueUSD.address],
     log: true,
     waitConfirmations: 1,
   });
   console.log(`TorqueFX deployed to: ${torqueFX.address}`);
 
-  // Deploy TorquePayments (after TorqueAccount is deployed)
-  console.log('\n14. Deploying TorquePayments...');
+  // Deploy TorquePayments
+  console.log('\n12. Deploying TorquePayments...');
   const torquePayments = await deploy('TorquePayments', {
     from: deployer,
-    args: [torqueAccount.address, torqueUSD.address, lzEndpoint],
+    args: [torqueUSD.address, lzEndpoint],
     log: true,
     waitConfirmations: 1,
   });
@@ -290,11 +215,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
   console.log(`TorqueMerchant deployed to: ${torqueMerchant.address}`);
 
-  // Deploy TorqueRewards (updated with new dependencies)
-  console.log('\n18. Deploying TorqueRewards...');
+  // Deploy TorqueRewards (updated without TorqueAccount)
+  console.log('\n13. Deploying TorqueRewards...');
   const torqueRewards = await deploy('TorqueRewards', {
     from: deployer,
-    args: [torqueUSD.address, torqueAccount.address, torquePayments.address, torqueFX.address],
+    args: [torqueUSD.address, torquePayments.address, torqueFX.address],
     log: true,
     waitConfirmations: 1,
   });
@@ -317,15 +242,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`  TorqueMerchant: ${torqueMerchant.address}`);
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
   console.log(`  TorqueBatchMinter: ${torqueBatchMinter.address}`);
-  console.log(`\n4337 Contracts:`);
-  console.log(`  EntryPoint: ${entryPoint.address}`);
-  console.log(`  TorqueAccountFactory: ${torqueAccountFactory.address}`);
-  console.log(`  TorqueAccount: ${torqueAccount.address}`);
-  console.log(`  TorqueAccountBundler: ${torqueAccountBundler.address}`);
-  console.log(`  TorqueAccountCrossChain: ${torqueAccountCrossChain.address}`);
-  console.log(`  TorqueAccountGasOptimizer: ${torqueAccountGasOptimizer.address}`);
-  console.log(`  TorqueAccountRecovery: ${torqueAccountRecovery.address}`);
-  console.log(`  TorqueAccountUpgrade: ${torqueAccountUpgrade.address}`);
   console.log(`\nCurrency Tokens:`);
   deployedCurrencies.forEach(currency => {
     console.log(`  ${currency.symbol}: ${currency.address}`);
@@ -352,14 +268,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       torqueMerchant: torqueMerchant.address,
       torqueRewards: torqueRewards.address,
       torqueBatchMinter: torqueBatchMinter.address,
-      entryPoint: entryPoint.address,
-      torqueAccountFactory: torqueAccountFactory.address,
-      torqueAccount: torqueAccount.address,
-      torqueAccountBundler: torqueAccountBundler.address,
-      torqueAccountCrossChain: torqueAccountCrossChain.address,
-      torqueAccountGasOptimizer: torqueAccountGasOptimizer.address,
-      torqueAccountRecovery: torqueAccountRecovery.address,
-      torqueAccountUpgrade: torqueAccountUpgrade.address,
       currencies: deployedCurrencies,
       engines: deployedEngines,
     },

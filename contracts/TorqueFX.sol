@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "./interfaces/ITorqueAccount.sol";
 import "./interfaces/ITorqueDEX.sol";
 
 contract TorqueFX is Ownable, ReentrancyGuard {
@@ -16,7 +15,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 collateral;
         int256 entryPrice;
         bool isLong;
-        uint256 accountId;
         uint256 lastLiquidationAmount;
         uint256 stopLossPrice;
         uint256 takeProfitPrice;
@@ -34,7 +32,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 collateral;
         int256 price;
         bool isLong;
-        uint256 accountId;
         OrderType orderType;
         OrderStatus status;
         uint256 expiry;
@@ -57,7 +54,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     IERC20 public immutable usdc;
-    ITorqueAccount public immutable accountContract;
     ITorqueDEX public immutable dexContract;
     address public feeRecipient;
 
@@ -89,7 +85,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     mapping(bytes32 => uint256) public maxPoolExposure;
     mapping(bytes32 => uint256) public hedgeThreshold;
 
-    event PositionOpened(address indexed user, bytes32 indexed pair, uint256 collateral, uint256 leverage, bool isLong, uint256 accountId, int256 entryPrice);
+    event PositionOpened(address indexed user, bytes32 indexed pair, uint256 collateral, uint256 leverage, bool isLong, int256 entryPrice);
     event PositionClosed(address indexed user, bytes32 indexed pair, int256 pnl, uint256 collateralReturned, uint256 feeCharged);
     event PositionLiquidated(address indexed user, bytes32 indexed pair, int256 pnl, uint256 feeCharged, uint256 liquidationAmount, bool isFullLiquidation);
     event OrderPlaced(address indexed user, bytes32 indexed pair, uint256 orderId, OrderType orderType, int256 price, uint256 collateral, bool isLong);
@@ -113,11 +109,9 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     constructor(
-        address _accountContract,
         address _dexContract,
         address _usdc
     ) Ownable(msg.sender) {
-        accountContract = ITorqueAccount(_accountContract);
         dexContract = ITorqueDEX(_dexContract);
         usdc = IERC20(_usdc);
         feeRecipient = msg.sender;
@@ -134,15 +128,12 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 collateral,
         int256 price,
         bool isLong,
-        uint256 accountId,
+        uint256 leverage,
         OrderType orderType
     ) external nonReentrant {
         require(priceFeeds[pair] != address(0), "Pair not allowed");
         require(orderCount[msg.sender] < MAX_PENDING_ORDERS, "Too many pending orders");
-        
-        (uint256 leverage, bool exists, bool active,,) = accountContract.userAccounts(msg.sender, accountId);
-        require(exists && active, "Invalid account");
-        require(leverage >= 100 && leverage <= 10000, "Invalid leverage");
+        require(leverage >= 100 && leverage <= 50000, "Invalid leverage");
 
         _checkPositionSize(collateral, leverage);
         _checkCircuitBreaker();
@@ -153,7 +144,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             collateral: collateral,
             price: price,
             isLong: isLong,
-            accountId: accountId,
             orderType: orderType,
             status: OrderStatus.PENDING,
             expiry: block.timestamp + ORDER_EXPIRY,
@@ -224,7 +214,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     function openPosition(
-        uint256 accountId,
         address baseToken,
         address quoteToken,
         uint256 collateral,
@@ -232,9 +221,8 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         bool isLong
     ) external returns (uint256 positionId) {
         // CHECKS
-        require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
         require(collateral > 0, "Invalid collateral");
-        require(leverage >= 1 && leverage <= 10000, "Invalid leverage");
+        require(leverage >= 1 && leverage <= 50000, "Invalid leverage");
 
         // Calculate position size
         uint256 positionSize = collateral * leverage;
@@ -250,19 +238,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
         // EFFECTS
         positionId = _createPosition(
-            accountId,
-            baseToken,
-            quoteToken,
-            collateral,
-            positionSize,
-            price,
-            isLong
-        );
-
-        // Update account position
-        accountContract.openPosition(
-            accountId,
-            positionId,
             baseToken,
             quoteToken,
             collateral,
@@ -281,7 +256,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 tokensReceived = dexContract.swap(
             isLong ? quoteToken : baseToken,
             requiredTokens,
-            accountId
+            0
         );
 
         bytes32 pair = keccak256(abi.encodePacked(baseToken, quoteToken));
@@ -291,13 +266,11 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             collateral,
             leverage,
             isLong,
-            accountId,
             int256(price)
         );
     }
 
     function _createPosition(
-        uint256 accountId,
         address baseToken,
         address quoteToken,
         uint256 collateral,
@@ -311,7 +284,6 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             collateral: collateral,
             entryPrice: int256(price),
             isLong: isLong,
-            accountId: accountId,
             lastLiquidationAmount: 0,
             stopLossPrice: 0,
             takeProfitPrice: 0,
@@ -397,14 +369,10 @@ contract TorqueFX is Ownable, ReentrancyGuard {
     }
 
     function closePosition(
-        uint256 accountId,
         bytes32 pair
     ) external returns (uint256 pnl) {
         // CHECKS
-        require(accountContract.isValidAccount(msg.sender, accountId), "Invalid account");
-        
         Position storage position = positions[msg.sender][pair];
-        require(position.accountId == accountId, "Position not found");
         require(position.isOpen, "Position closed");
 
         // Get current price from DEX
@@ -430,22 +398,15 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         position.closePrice = currentPrice;
         position.pnl = int256(pnl);
 
-        // Update account position
-        accountContract.closePosition(
-            accountId,
-            position.positionId,
-            int256(pnl)
-        );
-
         // INTERACTIONS
         // Execute reverse swap through DEX
         uint256 tokensReceived = dexContract.swap(
             position.isLong ? position.baseToken : position.quoteToken,
             tokensToSwap,
-            accountId
+            0
         );
 
-        // Transfer funds back to account
+        // Transfer funds back to user
         if (pnl > 0) {
             usdc.transfer(msg.sender, pnl);
         }
@@ -468,8 +429,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         require(pos.collateral > 0, "No position");
 
         int256 currentPrice = getLatestPrice(pair);
-        uint256 leverage = accountContract.getLeverage(user, pos.accountId);
-        uint256 notionalValue = pos.collateral * leverage / 100;
+        uint256 notionalValue = pos.positionSize;
         
         int256 pnl = pos.isLong 
             ? int256((currentPrice - pos.entryPrice) * int256(pos.collateral) / pos.entryPrice)

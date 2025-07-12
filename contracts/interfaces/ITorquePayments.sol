@@ -6,13 +6,11 @@ import "../TorquePayments.sol";
 interface ITorquePayments {
     // Core payment functions
     function createPayment(
-        TorquePayments.PaymentRequest calldata request,
-        uint256 accountId
+        TorquePayments.PaymentRequest calldata request
     ) external returns (bytes32 paymentId);
     
     function processPayment(
-        bytes32 paymentId,
-        uint256 accountId
+        bytes32 paymentId
     ) external;
     
     // View functions

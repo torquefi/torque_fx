@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "./interfaces/ITorqueAccount.sol";
 
 contract TorqueRouter is Ownable {
     struct Pair {
@@ -17,15 +16,14 @@ contract TorqueRouter is Ownable {
     mapping(address => bool) public allowedTokens;
     mapping(address => bool) public allowedPriceFeeds;
 
-    ITorqueAccount public torqueAccount;
+
 
     event PairAdded(bytes32 indexed pairId, address token0, address token1, address priceFeed);
     event PairRemoved(bytes32 indexed pairId);
     event TokenAllowed(address indexed token, bool allowed);
     event PriceFeedAllowed(address indexed feed, bool allowed);
 
-    constructor(address _torqueAccount) Ownable(msg.sender) {
-        torqueAccount = ITorqueAccount(_torqueAccount);
+    constructor() Ownable(msg.sender) {
     }
 
     function addPair(
@@ -79,8 +77,5 @@ contract TorqueRouter is Ownable {
         return price;
     }
 
-    function isValidAccount(address user, uint256 accountId) public view returns (bool) {
-        (, bool exists, bool active, , ) = torqueAccount.userAccounts(user, accountId);
-        return exists && active;
-    }
+
 }

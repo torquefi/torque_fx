@@ -5,12 +5,14 @@
   "scripts": {
     "test": "npx hardhat test",
     "compile": "npx hardhat compile",
-    "deploy": "npx hardhat deploy",
-    "deploy:testnet": "npx hardhat deploy --tags Torque --network sepolia && npx hardhat deploy --tags Torque --network baseGoerli && npx hardhat deploy --tags Torque --network arbitrumSepolia",
-    "link": "npx hardhat deploy --tags Link",
-    "link:testnet": "npx hardhat deploy --tags Link --network sepolia && npx hardhat deploy --tags Link --network baseGoerli && npx hardhat deploy --tags Link --network arbitrumSepolia",
-    "deploy:all": "npx hardhat deploy --tags Torque,Link",
-    "deploy:all:testnet": "npx hardhat deploy --tags Torque,Link --network sepolia && npx hardhat deploy --tags Torque,Link --network baseGoerli && npx hardhat deploy --tags Torque,Link --network arbitrumSepolia"
+    "deploy": "npx hardhat run scripts/01_deploy_torque.ts",
+    "deploy:testnet": "npx hardhat run scripts/01_deploy_torque.ts --network sepolia && npx hardhat run scripts/01_deploy_torque.ts --network baseGoerli && npx hardhat run scripts/01_deploy_torque.ts --network arbitrumSepolia",
+    "link": "npx hardhat run scripts/02_link_contracts.ts",
+    "link:testnet": "npx hardhat run scripts/02_link_contracts.ts --network sepolia && npx hardhat run scripts/02_link_contracts.ts --network baseGoerli && npx hardhat run scripts/02_link_contracts.ts --network arbitrumSepolia",
+    "deploy:all": "npm run deploy && npm run link",
+    "deploy:all:testnet": "npm run deploy:testnet && npm run link:testnet",
+    "add-collateral": "npx hardhat run scripts/03_add_collateral_tokens.ts",
+    "add-collateral:testnet": "npx hardhat run scripts/03_add_collateral_tokens.ts --network sepolia"
   },
   "keywords": [
     "defi",
@@ -21,7 +23,7 @@
   ],
   "author": "",
   "license": "GPL-3.0",
-  "description": "Cross-chain DeFi protocol for synthetic assets with batch minting capabilities",
+  "description": "Cross-chain DeFi protocol for leveraged trading and payments with direct wallet integration",
   "devDependencies": {
     "@layerzerolabs/devtools-evm": "^2.0.0",
     "@layerzerolabs/lz-definitions": "^3.0.107",
@@ -52,7 +54,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@account-abstraction/contracts": "^0.8.0",
     "@chainlink/contracts": "^1.4.0",
     "@layerzerolabs/lz-evm-oapp-v2": "^3.0.107",
     "@layerzerolabs/lz-evm-protocol-v2": "^3.0.107",

@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./TorquePayments.sol";
 import "./interfaces/ITorquePayments.sol";
-import "./interfaces/ITorqueAccount.sol";
 import "./TorqueFX.sol";
 
 interface ITorqueFX {
@@ -15,7 +14,6 @@ interface ITorqueFX {
         uint256 collateral,
         int256 entryPrice,
         bool isLong,
-        uint256 accountId,
         uint256 lastLiquidationAmount,
         uint256 stopLossPrice,
         uint256 takeProfitPrice,
@@ -31,7 +29,6 @@ interface ITorqueFX {
 
 contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
     IERC20 public immutable rewardToken;
-    ITorqueAccount public immutable torqueAccount;
     ITorquePayments public immutable torquePayments;
     ITorqueFX public immutable torqueFX;
 
@@ -121,12 +118,10 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
 
     constructor(
         address _rewardToken,
-        address _torqueAccount,
         address _torquePayments,
         address _torqueFX
     ) Ownable(msg.sender) {
         rewardToken = IERC20(_rewardToken);
-        torqueAccount = ITorqueAccount(_torqueAccount);
         torquePayments = ITorquePayments(_torquePayments);
         torqueFX = ITorqueFX(_torqueFX);
         
@@ -235,7 +230,6 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
      */
     function awardFXTradingReward(
         address trader,
-        uint256 accountId,
         uint256 tradeVolume,
         bytes32 pair
     ) external {
@@ -342,23 +336,7 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev Award referral rewards
      */
-    function awardReferralReward(
-        address referrer,
-        address referredUser,
-        uint256 referredUserActivity
-    ) external {
-        require(msg.sender == address(torqueAccount), "Only TorqueAccount");
-        require(rewardConfigs[RewardType.REFERRAL].active, "Referral rewards disabled");
-        
-        uint256 reward = _calculateReward(
-            RewardType.REFERRAL,
-            referredUserActivity,
-            referrer
-        );
-        
-        _distributeReward(referrer, RewardType.REFERRAL, reward, referredUserActivity);
-        _updateActivityScore(referrer, 3); // Referrals give moderate activity score
-    }
+
 
     /**
      * @dev Calculate reward amount based on activity and user tier

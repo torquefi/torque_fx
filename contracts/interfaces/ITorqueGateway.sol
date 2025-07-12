@@ -16,7 +16,6 @@ interface ITorqueGateway {
     ) external returns (bytes32 sessionId);
     function processPaymentSession(
         bytes32 sessionId,
-        uint256 accountId,
         bytes calldata signature
     ) external;
     function withdrawBalance(uint256 amount) external;

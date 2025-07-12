@@ -21,6 +21,6 @@ interface ITorqueDEX {
         uint256 entryPrice,
         uint256 currentPrice
     );
-    function swap(address tokenIn, uint256 amountIn, uint256 accountId) external returns (uint256 amountOut);
+    function swap(address tokenIn, uint256 amountIn) external returns (uint256 amountOut);
     function getPrice(address baseToken, address quoteToken) external view returns (uint256 price);
 } 

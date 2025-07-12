@@ -4,7 +4,6 @@ import { Contract } from "ethers";
 
 describe("TorqueFX", function () {
   let torqueFX: Contract;
-  let torqueAccount: Contract;
   let usdc: Contract;
   let mockPriceFeed: Contract;
   let owner: any;
@@ -22,14 +21,9 @@ describe("TorqueFX", function () {
     usdc = await MockUSDC.deploy("USD Coin", "USDC", 6);
     await usdc.deployed();
 
-    // Deploy TorqueAccount
-    const TorqueAccount = await ethers.getContractFactory("TorqueAccount");
-    torqueAccount = await TorqueAccount.deploy();
-    await torqueAccount.deployed();
-
     // Deploy TorqueFX
     const TorqueFX = await ethers.getContractFactory("TorqueFX");
-    torqueFX = await TorqueFX.deploy(usdc.address, torqueAccount.address);
+    torqueFX = await TorqueFX.deploy(usdc.address, usdc.address); // Using USDC as both DEX and USDC
     await torqueFX.deployed();
 
     // Deploy mock price feed
@@ -47,9 +41,6 @@ describe("TorqueFX", function () {
     // Set fee recipient
     await torqueFX.setFeeRecipient(owner.address);
 
-    // Create test account
-    await torqueAccount.connect(user).createAccount(LEVERAGE, false, "testuser", ethers.ZeroAddress);
-
     // Mint USDC to user
     await usdc.mint(user.address, MARGIN * 10n);
     await usdc.connect(user).approve(torqueFX.address, MARGIN * 10n);
@@ -57,16 +48,16 @@ describe("TorqueFX", function () {
 
   describe("Position Management", function () {
     it("should open a long position", async function () {
-      await torqueFX.connect(user).openPosition(pairId, MARGIN, true, 1);
+      await torqueFX.connect(user).openPosition(usdc.address, usdc.address, MARGIN, LEVERAGE, true);
       const position = await torqueFX.positions(user.address, pairId);
-      expect(position.margin).to.equal(MARGIN);
+      expect(position.collateral).to.equal(MARGIN);
       expect(position.isLong).to.be.true;
     });
 
     it("should open a short position", async function () {
-      await torqueFX.connect(user).openPosition(pairId, MARGIN, false, 1);
+      await torqueFX.connect(user).openPosition(usdc.address, usdc.address, MARGIN, LEVERAGE, false);
       const position = await torqueFX.positions(user.address, pairId);
-      expect(position.margin).to.equal(MARGIN);
+      expect(position.collateral).to.equal(MARGIN);
       expect(position.isLong).to.be.false;
     });
 

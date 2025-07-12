@@ -30,12 +30,20 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     mapping(address => uint256) private s_collateralDeposited;
     mapping(address => uint256) private s_torqueMinted;
     address public treasuryAddress;
+    
+    // Multi-collateral support
+    mapping(address => bool) public supportedCollateral;
+    mapping(address => address) public collateralPriceFeeds;
+    mapping(address => uint8) public collateralDecimals;
+    address[] public supportedCollateralList;
 
     // Events
     event CollateralDeposited(address indexed user, uint256 amount);
     event CollateralRedeemed(address indexed from, address indexed to, uint256 amount);
     event TorqueMinted(address indexed user, uint256 amount);
     event TorqueBurned(address indexed user, uint256 amount);
+    event CollateralTokenAdded(address indexed token, uint8 decimals, address priceFeed);
+    event CollateralTokenRemoved(address indexed token);
 
     // Modifiers
     modifier moreThanZero(uint256 amount) {
@@ -51,6 +59,78 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     function getPriceFeed() public view virtual returns (AggregatorV3Interface);
     function getTorqueToken() public view virtual returns (IERC20);
     function getCollateralDecimals() public view virtual returns (uint8);
+    
+    /**
+     * @dev Add a new collateral token
+     */
+    function addCollateralToken(
+        address token,
+        uint8 decimals,
+        address priceFeed
+    ) external onlyOwner {
+        require(token != address(0), "Invalid token");
+        require(!supportedCollateral[token], "Token already supported");
+        
+        supportedCollateral[token] = true;
+        collateralDecimals[token] = decimals;
+        collateralPriceFeeds[token] = priceFeed;
+        supportedCollateralList.push(token);
+        
+        emit CollateralTokenAdded(token, decimals, priceFeed);
+    }
+    
+    /**
+     * @dev Remove a collateral token
+     */
+    function removeCollateralToken(address token) external onlyOwner {
+        require(supportedCollateral[token], "Token not supported");
+        
+        supportedCollateral[token] = false;
+        
+        // Remove from list
+        for (uint256 i = 0; i < supportedCollateralList.length; i++) {
+            if (supportedCollateralList[i] == token) {
+                supportedCollateralList[i] = supportedCollateralList[supportedCollateralList.length - 1];
+                supportedCollateralList.pop();
+                break;
+            }
+        }
+        
+        emit CollateralTokenRemoved(token);
+    }
+    
+    /**
+     * @dev Get supported collateral tokens
+     */
+    function getSupportedCollateral() external view returns (address[] memory) {
+        return supportedCollateralList;
+    }
+    
+    /**
+     * @dev Check if a token is supported as collateral
+     */
+    function isCollateralSupported(address token) external view returns (bool) {
+        return supportedCollateral[token];
+    }
+    
+    /**
+     * @dev Get collateral value in USD for a specific token
+     */
+    function getCollateralValue(address token, uint256 amount) public view returns (uint256) {
+        if (collateralPriceFeeds[token] == address(0)) {
+            // No price feed, assume 1:1 with USD (for USDC, USDT)
+            return amount;
+        }
+        
+        // Get price from Chainlink feed
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(collateralPriceFeeds[token]);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+        require(price > 0, "Invalid price feed");
+        
+        // Convert to USD value (assuming price feed is in USD with 8 decimals)
+        uint8 tokenDecimals = collateralDecimals[token];
+        return (amount * uint256(price)) / (10 ** (8 + tokenDecimals - 6));
+    }
 
     function depositCollateral(uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant {
         // CHECKS
@@ -61,6 +141,20 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
 
         // INTERACTIONS
         require(getCollateralToken().transferFrom(msg.sender, address(this), amountCollateral), "Transfer failed");
+        
+        emit CollateralDeposited(msg.sender, amountCollateral);
+    }
+    
+    function depositCollateral(address collateralToken, uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant {
+        // CHECKS
+        require(amountCollateral > 0, "Amount must be greater than 0");
+        require(supportedCollateral[collateralToken], "Collateral token not supported");
+
+        // EFFECTS
+        s_collateralDeposited[msg.sender] += amountCollateral;
+
+        // INTERACTIONS
+        require(IERC20(collateralToken).transferFrom(msg.sender, address(this), amountCollateral), "Transfer failed");
         
         emit CollateralDeposited(msg.sender, amountCollateral);
     }

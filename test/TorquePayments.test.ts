@@ -7,7 +7,6 @@ describe("TorquePayments System", function () {
   let torquePayments: TorquePayments;
   let torqueGateway: TorqueGateway;
   let torqueMerchant: TorqueMerchant;
-  let mockTorqueAccount: Contract;
   let mockUSDC: Contract;
   let mockLZEndpoint: Contract;
   
@@ -28,16 +27,12 @@ describe("TorquePayments System", function () {
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     mockUSDC = await MockERC20.deploy("Torque USD", "TUSD", 6);
 
-    const MockTorqueAccount = await ethers.getContractFactory("MockTorqueAccount");
-    mockTorqueAccount = await MockTorqueAccount.deploy(mockUSDC.getAddress());
-
     const MockLZEndpoint = await ethers.getContractFactory("MockLZEndpoint");
     mockLZEndpoint = await MockLZEndpoint.deploy();
 
     // Deploy payment contracts
     const TorquePayments = await ethers.getContractFactory("TorquePayments");
     torquePayments = await TorquePayments.deploy(
-      await mockTorqueAccount.getAddress(),
       await mockUSDC.getAddress(),
       await mockLZEndpoint.getAddress()
     );
@@ -54,12 +49,9 @@ describe("TorquePayments System", function () {
       await torqueGateway.getAddress()
     );
 
-    // Setup initial state
-    await mockUSDC.mint(await mockTorqueAccount.getAddress(), ethers.parseUnits("1000000", 6));
-    await mockTorqueAccount.setValidAccount(await customer.getAddress(), 1, true);
-    await mockTorqueAccount.setValidAccount(await customer2.getAddress(), 1, true);
-    await mockTorqueAccount.setBalance(await customer.getAddress(), 1, PAYMENT_AMOUNT * 10n);
-    await mockTorqueAccount.setBalance(await customer2.getAddress(), 1, PAYMENT_AMOUNT * 10n);
+    // Setup initial state - mint USDC to customers directly
+    await mockUSDC.mint(await customer.getAddress(), ethers.parseUnits("1000000", 6));
+    await mockUSDC.mint(await customer2.getAddress(), ethers.parseUnits("1000000", 6));
 
     // Authorize merchant
     await torquePayments.setMerchantAuthorization(await merchant.getAddress(), true);
@@ -85,7 +77,7 @@ describe("TorquePayments System", function () {
         metadata: "0x"
       };
 
-      const tx = await torquePayments.connect(customer).createPayment(paymentRequest, 1);
+      const tx = await torquePayments.connect(customer).createPayment(paymentRequest);
       const receipt = await tx.wait();
       
       const event = receipt?.logs.find(log => 
@@ -107,7 +99,7 @@ describe("TorquePayments System", function () {
         metadata: "0x"
       };
 
-      const createTx = await torquePayments.connect(customer).createPayment(paymentRequest, 1);
+      const createTx = await torquePayments.connect(customer).createPayment(paymentRequest);
       const createReceipt = await createTx.wait();
       
       const createEvent = createReceipt?.logs.find(log => 
@@ -116,7 +108,7 @@ describe("TorquePayments System", function () {
       const paymentId = createEvent?.topics[1];
 
       // Process payment
-      const processTx = await torquePayments.connect(customer).processPayment(paymentId!, 1);
+      const processTx = await torquePayments.connect(customer).processPayment(paymentId!);
       const processReceipt = await processTx.wait();
       
       const processEvent = processReceipt?.logs.find(log => 
@@ -136,8 +128,7 @@ describe("TorquePayments System", function () {
         await mockUSDC.getAddress(),
         86400, // 1 day interval
         12, // 12 billing cycles
-        "Test subscription",
-        1
+        "Test subscription"
       );
 
       const receipt = await subscriptionTx.wait();
@@ -170,7 +161,7 @@ describe("TorquePayments System", function () {
       const invoiceId = createEvent?.topics[1];
 
       // Pay invoice
-      const payTx = await torquePayments.connect(customer).payInvoice(invoiceId!, 1);
+      const payTx = await torquePayments.connect(customer).payInvoice(invoiceId!);
       const payReceipt = await payTx.wait();
       
       const payEvent = payReceipt?.logs.find(log => 

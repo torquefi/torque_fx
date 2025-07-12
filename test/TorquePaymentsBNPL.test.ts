@@ -4,11 +4,9 @@ import { Contract, ContractFactory, Signer, BigNumber } from "ethers";
 
 describe("TorquePayments BNPL", function () {
   let TorquePayments: ContractFactory;
-  let TorqueAccount: ContractFactory;
   let TorqueUSDFactory: ContractFactory;
   let TorqueEURFactory: ContractFactory;
   let payments: Contract;
-  let accountContract: Contract;
   let torqueUSD: Contract;
   let torqueEUR: Contract;
   let owner: Signer;
@@ -45,13 +43,9 @@ describe("TorquePayments BNPL", function () {
     torqueUSD = await TorqueUSDFactory.deploy("Torque USD", "TUSD", mockLzEndpoint);
     torqueEUR = await TorqueEURFactory.deploy("Torque EUR", "TEUR", mockLzEndpoint);
 
-    // Deploy TorqueAccount contract
-    TorqueAccount = await ethers.getContractFactory("TorqueAccount");
-    accountContract = await TorqueAccount.deploy();
-
     // Deploy TorquePayments contract
     TorquePayments = await ethers.getContractFactory("TorquePayments");
-    payments = await TorquePayments.deploy(accountContract.address, torqueUSD.address, mockLzEndpoint);
+    payments = await TorquePayments.deploy(torqueUSD.address, mockLzEndpoint);
 
     // Setup initial state - use correct function name and Torque currencies
     await payments.setSupportedTorqueCurrency(torqueUSD.address, true);
