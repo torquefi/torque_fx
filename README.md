@@ -75,7 +75,7 @@ const routerAddress = getContractAddress('ethereum', 'torqueRouter');
 - **Stablecoins**: USDC, USDT, USDS, WYST, etc.
 - **Other Assets**: cbBTC, cbETH, WETH, WBTC, LINK, etc.
 
-For detailed configuration docs, see [`docs/config.md`](docs/config.md).
+For detailed configuration docs, see [`docs/config.md`](docs/CONFIG.md).
 
 ## Contract Addresses
 
