@@ -47,7 +47,7 @@ export const collateralTokens: CollateralToken[] = [
       base: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
       sonic: "0x6047828dc181963ba44974801FF68e538dA5eaF9",
       abstract: "0x0709F39376dEEe2A2dfC94A58EdEb2Eb9DF012bD",
-      optimism: "0x..."
+      optimism: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58"
     },
     priceFeeds: {
       ethereum: "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
