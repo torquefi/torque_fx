@@ -94,6 +94,16 @@ export const collateralTokens: CollateralToken[] = [
     }
   },
   {
+    symbol: "GHO",
+    name: "Aave GHO",
+    contracts: {
+      ethereum: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"
+    },
+    priceFeeds: {
+      ethereum: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC"
+    }
+  },
+  {
     symbol: "cbBTC",
     name: "Coinbase Bitcoin",
     contracts: {
@@ -214,10 +224,44 @@ export const collateralTokens: CollateralToken[] = [
     symbol: "LINK",
     name: "Chainlink",
     contracts: {
-      ethereum: "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+      ethereum: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+      arbitrum: "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
+      avalanche: "0x5947BB275c521040051D82396192181b413227A3",
+      base: "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
+      bsc: "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
+      optimism: "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
+      polygon: "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39",
+      sonic: "0x71052BAe71C25C78E37fD12E5ff1101A71d9018F"
     },
     priceFeeds: {
-      ethereum: "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c"
+      ethereum: "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c",
+      arbitrum: "0x86E53CF1B870786351Da77A57575e79CB55812CB",
+      avalanche: "0x49ccd9ca821EfEab2b98c60dC60F518E765EDe9a",
+      base: "0x17CAb8FE31E32f08326e5E27412894e49B0f9D65",
+      bsc: "0xca236E327F629f9Fc2c30A4E95775EbF0B89fac8",
+      optimism: "0xCc232dcFAAE6354cE191Bd574108c1aD03f86450",
+      polygon: "0xd9FFdb71EbE7496cC440152d43986Aae0AB76665",
+      sonic: "0x26e450ca14D7bF598C89f212010c691434486119"
+    }
+  },
+  {
+    symbol: "AAVE",
+    name: "Aave",
+    contracts: {
+      ethereum: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
+    },
+    priceFeeds: {
+      ethereum: "0xbd7F896e60B650C01caf2d7279a1148189A68884"
+    }
+  },
+  {
+    symbol: "COMP",
+    name: "Compound",
+    contracts: {
+      ethereum: "0xc00e94Cb662C3520282E6f5717214004A7f26888"
+    },
+    priceFeeds: {
+      ethereum: "0xdbd020CAeF83eFd542f4De03e3cF0C28A4428bd5"
     }
   }
 ];
