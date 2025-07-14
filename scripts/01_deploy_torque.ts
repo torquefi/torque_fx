@@ -75,6 +75,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Deploy currency engines
   console.log('\n5. Deploying currency engines...');
   const engines = [
+    { name: 'Torque USD Engine', contract: 'TorqueUSDEngine' },
     { name: 'Torque EUR Engine', contract: 'TorqueEUREngine' },
     { name: 'Torque GBP Engine', contract: 'TorqueGBPEngine' },
     { name: 'Torque JPY Engine', contract: 'TorqueJPYEngine' },
@@ -162,64 +163,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
   console.log(`TorqueFX deployed to: ${torqueFX.address}`);
 
-  // Deploy TorquePayments
-  console.log('\n12. Deploying TorquePayments...');
-  const torquePayments = await deploy('TorquePayments', {
-    from: deployer,
-    args: [torqueUSD.address, lzEndpoint],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorquePayments deployed to: ${torquePayments.address}`);
-
-  // Set up supported Torque currencies
-  console.log('\n15. Setting up supported Torque currencies...');
-  const paymentsContract = await ethers.getContractAt('TorquePayments', torquePayments.address);
-  
-  // Add all Torque currencies as supported
-  const allTorqueCurrencies = [
-    { address: torqueUSD.address, symbol: 'TUSD' },
-    ...deployedCurrencies.map(currency => ({
-      address: currency.address,
-      symbol: currency.symbol
-    }))
-  ];
-
-  for (const currency of allTorqueCurrencies) {
-    try {
-      const setCurrencyTx = await paymentsContract.setSupportedTorqueCurrency(currency.address, true);
-      await setCurrencyTx.wait();
-      console.log(`✅ ${currency.symbol} added as supported currency`);
-    } catch (error: any) {
-      console.log(`⚠️  Failed to add ${currency.symbol}:`, error?.message || 'Unknown error');
-    }
-  }
-
-  // Deploy TorqueGateway
-  console.log('\n16. Deploying TorqueGateway...');
-      const torqueGateway = await deploy('TorqueGateway', {
-    from: deployer,
-    args: [torquePayments.address, lzEndpoint, deployer],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueGateway deployed to: ${torqueGateway.address}`);
-
-  // Deploy TorqueMerchant
-  console.log('\n17. Deploying TorqueMerchant...');
-  const torqueMerchant = await deploy('TorqueMerchant', {
-    from: deployer,
-    args: [torquePayments.address, torqueGateway.address],
-    log: true,
-    waitConfirmations: 1,
-  });
-  console.log(`TorqueMerchant deployed to: ${torqueMerchant.address}`);
-
-  // Deploy TorqueRewards (updated without TorqueAccount)
-  console.log('\n13. Deploying TorqueRewards...');
+  // Deploy TorqueRewards
+  console.log('\n12. Deploying TorqueRewards...');
   const torqueRewards = await deploy('TorqueRewards', {
     from: deployer,
-    args: [torqueUSD.address, torquePayments.address, torqueFX.address],
+    args: [torqueUSD.address, torqueFX.address],
     log: true,
     waitConfirmations: 1,
   });
@@ -237,9 +185,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`  TorqueRouter: ${torqueRouter.address}`);
   console.log(`  TorqueStake: ${torqueStake.address}`);
   console.log(`  TorqueFX: ${torqueFX.address}`);
-  console.log(`  TorquePayments: ${torquePayments.address}`);
-  console.log(`  TorqueGateway: ${torqueGateway.address}`);
-  console.log(`  TorqueMerchant: ${torqueMerchant.address}`);
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
   console.log(`  TorqueBatchMinter: ${torqueBatchMinter.address}`);
   console.log(`\nCurrency Tokens:`);
@@ -263,9 +208,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       torqueRouter: torqueRouter.address,
       torqueStake: torqueStake.address,
       torqueFX: torqueFX.address,
-      torquePayments: torquePayments.address,
-      torqueGateway: torqueGateway.address,
-      torqueMerchant: torqueMerchant.address,
       torqueRewards: torqueRewards.address,
       torqueBatchMinter: torqueBatchMinter.address,
       currencies: deployedCurrencies,

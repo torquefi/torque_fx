@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { readFileSync } from "fs";
 
 async function main() {
   console.log("Adding multi-collateral support to Torque engines...");
@@ -6,6 +7,20 @@ async function main() {
   // Get the signer
   const [deployer] = await ethers.getSigners();
   console.log("Using account:", deployer.address);
+
+  // Get network info
+  const network = await ethers.provider.getNetwork();
+  const deploymentFile = `deployment-${network.name}-${network.chainId}.json`;
+  
+  let deploymentData;
+  try {
+    deploymentData = JSON.parse(readFileSync(deploymentFile, 'utf8'));
+    console.log(`📁 Loaded deployment data from ${deploymentFile}`);
+  } catch (error) {
+    console.error(`❌ Could not load deployment file: ${deploymentFile}`);
+    console.error("Please run the deployment script first: yarn hardhat run scripts/01_deploy_torque.ts --network <network>");
+    process.exit(1);
+  }
 
   // Common token addresses (replace with actual addresses for your network)
   const USDC_ADDRESS = "0xA0b86a33E6441b8c4C8C8C8C8C8C8C8C8C8C8C8C"; // Replace with actual USDC address
@@ -19,19 +34,28 @@ async function main() {
   const ETH_PRICE_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"; // ETH/USD on mainnet
   const BTC_PRICE_FEED = "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"; // BTC/USD on mainnet
 
-  // Engine addresses (replace with actual deployed engine addresses)
+  // Get engine addresses from deployment data
   const ENGINE_ADDRESSES = {
-    TORQUE_USD_ENGINE: "0x...", // Replace with actual TorqueUSDEngine address
-    TORQUE_EUR_ENGINE: "0x...", // Replace with actual TorqueEUREngine address
-    TORQUE_GBP_ENGINE: "0x...", // Replace with actual TorqueGBPEngine address
-    TORQUE_JPY_ENGINE: "0x...", // Replace with actual TorqueJPYEngine address
-    TORQUE_AUD_ENGINE: "0x...", // Replace with actual TorqueAUDEngine address
-    TORQUE_CAD_ENGINE: "0x...", // Replace with actual TorqueCADEngine address
-    TORQUE_CHF_ENGINE: "0x...", // Replace with actual TorqueCHFEngine address
-    TORQUE_NZD_ENGINE: "0x...", // Replace with actual TorqueNZDEngine address
-    TORQUE_XAU_ENGINE: "0x...", // Replace with actual TorqueXAUEngine address
-    TORQUE_XAG_ENGINE: "0x..."  // Replace with actual TorqueXAGEngine address
+    TORQUE_USD_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueUSDEngine')?.address,
+    TORQUE_EUR_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueEUREngine')?.address,
+    TORQUE_GBP_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueGBPEngine')?.address,
+    TORQUE_JPY_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueJPYEngine')?.address,
+    TORQUE_AUD_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueAUDEngine')?.address,
+    TORQUE_CAD_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueCADEngine')?.address,
+    TORQUE_CHF_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueCHFEngine')?.address,
+    TORQUE_NZD_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueNZDEngine')?.address,
+    TORQUE_XAU_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueXAUEngine')?.address,
+    TORQUE_XAG_ENGINE: deploymentData.contracts.engines.find((e: any) => e.contract === 'TorqueXAGEngine')?.address
   };
+
+  // Validate all engine addresses are found
+  for (const [key, address] of Object.entries(ENGINE_ADDRESSES)) {
+    if (!address) {
+      console.error(`❌ Missing engine address for ${key}`);
+      process.exit(1);
+    }
+    console.log(`✅ ${key}: ${address}`);
+  }
 
   try {
     // Get all engine contracts
@@ -49,16 +73,16 @@ async function main() {
     };
 
     const engines = {
-      usd: engineFactories.TorqueUSDEngine.attach(ENGINE_ADDRESSES.TORQUE_USD_ENGINE),
-      eur: engineFactories.TorqueEUREngine.attach(ENGINE_ADDRESSES.TORQUE_EUR_ENGINE),
-      gbp: engineFactories.TorqueGBPEngine.attach(ENGINE_ADDRESSES.TORQUE_GBP_ENGINE),
-      jpy: engineFactories.TorqueJPYEngine.attach(ENGINE_ADDRESSES.TORQUE_JPY_ENGINE),
-      aud: engineFactories.TorqueAUDEngine.attach(ENGINE_ADDRESSES.TORQUE_AUD_ENGINE),
-      cad: engineFactories.TorqueCADEngine.attach(ENGINE_ADDRESSES.TORQUE_CAD_ENGINE),
-      chf: engineFactories.TorqueCHFEngine.attach(ENGINE_ADDRESSES.TORQUE_CHF_ENGINE),
-      nzd: engineFactories.TorqueNZDEngine.attach(ENGINE_ADDRESSES.TORQUE_NZD_ENGINE),
-      xau: engineFactories.TorqueXAUEngine.attach(ENGINE_ADDRESSES.TORQUE_XAU_ENGINE),
-      xag: engineFactories.TorqueXAGEngine.attach(ENGINE_ADDRESSES.TORQUE_XAG_ENGINE)
+      usd: engineFactories.TorqueUSDEngine.attach(ENGINE_ADDRESSES.TORQUE_USD_ENGINE) as any,
+      eur: engineFactories.TorqueEUREngine.attach(ENGINE_ADDRESSES.TORQUE_EUR_ENGINE) as any,
+      gbp: engineFactories.TorqueGBPEngine.attach(ENGINE_ADDRESSES.TORQUE_GBP_ENGINE) as any,
+      jpy: engineFactories.TorqueJPYEngine.attach(ENGINE_ADDRESSES.TORQUE_JPY_ENGINE) as any,
+      aud: engineFactories.TorqueAUDEngine.attach(ENGINE_ADDRESSES.TORQUE_AUD_ENGINE) as any,
+      cad: engineFactories.TorqueCADEngine.attach(ENGINE_ADDRESSES.TORQUE_CAD_ENGINE) as any,
+      chf: engineFactories.TorqueCHFEngine.attach(ENGINE_ADDRESSES.TORQUE_CHF_ENGINE) as any,
+      nzd: engineFactories.TorqueNZDEngine.attach(ENGINE_ADDRESSES.TORQUE_NZD_ENGINE) as any,
+      xau: engineFactories.TorqueXAUEngine.attach(ENGINE_ADDRESSES.TORQUE_XAU_ENGINE) as any,
+      xag: engineFactories.TorqueXAGEngine.attach(ENGINE_ADDRESSES.TORQUE_XAG_ENGINE) as any
     };
 
     console.log("\n=== Adding USDT as collateral to all engines ===");

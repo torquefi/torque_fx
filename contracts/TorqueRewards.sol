@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "./TorquePayments.sol";
-import "./interfaces/ITorquePayments.sol";
 import "./TorqueFX.sol";
 
 interface ITorqueFX {
@@ -29,16 +27,13 @@ interface ITorqueFX {
 
 contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
     IERC20 public immutable rewardToken;
-    ITorquePayments public immutable torquePayments;
     ITorqueFX public immutable torqueFX;
 
     // Reward categories for different economic activities
     enum RewardType { 
         FX_TRADING,           // Trading FX pairs
-        PAYMENT_PROCESSING,   // Processing payments
         LIQUIDITY_PROVISION,  // Providing liquidity
         STAKING,              // Staking for governance
-        CROSS_CHAIN,          // Cross-chain operations
         REFERRAL,             // Bringing new users
         VOLUME_BONUS          // High volume bonuses
     }
@@ -118,11 +113,9 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
 
     constructor(
         address _rewardToken,
-        address _torquePayments,
         address _torqueFX
     ) Ownable(msg.sender) {
         rewardToken = IERC20(_rewardToken);
-        torquePayments = ITorquePayments(_torquePayments);
         torqueFX = ITorqueFX(_torqueFX);
         
         _initializeRewardConfigs();
@@ -141,14 +134,6 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
             active: true
         });
 
-        // Payment Processing rewards - earn TORQ by using payments
-        rewardConfigs[RewardType.PAYMENT_PROCESSING] = RewardConfig({
-            baseRate: 10,      // 0.1% of payment volume
-            multiplier: 100,   // 1x multiplier
-            cap: 500 * 10**18, // 500 TORQ max per payment
-            active: true
-        });
-
         // Liquidity Provision rewards - earn TORQ by providing liquidity
         rewardConfigs[RewardType.LIQUIDITY_PROVISION] = RewardConfig({
             baseRate: 50,      // 0.5% of liquidity provided
@@ -162,14 +147,6 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
             baseRate: 100,     // 1% of staked amount
             multiplier: 100,   // 1x multiplier
             cap: 5000 * 10**18, // 5000 TORQ max per staking action
-            active: true
-        });
-
-        // Cross-chain rewards - earn TORQ by using cross-chain features
-        rewardConfigs[RewardType.CROSS_CHAIN] = RewardConfig({
-            baseRate: 75,      // 0.75% of cross-chain volume
-            multiplier: 100,   // 1x multiplier
-            cap: 1500 * 10**18, // 1500 TORQ max per cross-chain operation
             active: true
         });
 
@@ -246,26 +223,7 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
         _updateActivityScore(trader, 10); // Trading gives high activity score
     }
 
-    /**
-     * @dev Award rewards for payment processing activity
-     */
-    function awardPaymentReward(
-        address payer,
-        uint256 paymentAmount,
-        bytes32 paymentId
-    ) external {
-        require(msg.sender == address(torquePayments), "Only TorquePayments");
-        require(rewardConfigs[RewardType.PAYMENT_PROCESSING].active, "Payment rewards disabled");
-        
-        uint256 reward = _calculateReward(
-            RewardType.PAYMENT_PROCESSING,
-            paymentAmount,
-            payer
-        );
-        
-        _distributeReward(payer, RewardType.PAYMENT_PROCESSING, reward, paymentAmount);
-        _updateActivityScore(payer, 5); // Payments give medium activity score
-    }
+
 
     /**
      * @dev Award rewards for liquidity provision
@@ -312,26 +270,7 @@ contract TorqueRewards is Ownable, ReentrancyGuard, Pausable {
         _updateActivityScore(staker, 8); // Staking gives good activity score
     }
 
-    /**
-     * @dev Award rewards for cross-chain operations
-     */
-    function awardCrossChainReward(
-        address user,
-        uint256 crossChainAmount,
-        uint16 dstChainId
-    ) external {
-        require(msg.sender == address(torquePayments), "Only TorquePayments");
-        require(rewardConfigs[RewardType.CROSS_CHAIN].active, "Cross-chain rewards disabled");
-        
-        uint256 reward = _calculateReward(
-            RewardType.CROSS_CHAIN,
-            crossChainAmount,
-            user
-        );
-        
-        _distributeReward(user, RewardType.CROSS_CHAIN, reward, crossChainAmount);
-        _updateActivityScore(user, 12); // Cross-chain gives high activity score
-    }
+
 
     /**
      * @dev Award referral rewards

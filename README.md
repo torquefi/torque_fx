@@ -19,11 +19,6 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - **fxAMM DEX**: Swap tokens and provide liquidity via TorqueDEX pools
 - **Leveraged Trading**: Open long/short positions with up to 500x leverage
 - **Liquidity Provision**: Provide DEX liquidity across stable and concentrated pools
-- **Cross-Chain Payments**: Seamless cross-chain payment settlement via LayerZero
-- **Mass Payments**: Bulk payment processing for contractors and freelancers
-- **Buy Now Pay Later**: Flexible installment payment options with configurable terms
-- **Merchant Dashboard**: Comprehensive analytics, reporting, and merchant management
-- **Donations**: Multi-currency donation system with analytics and transparency
 - **Rewards**: Stake, earn, and claim rewards via Torque Rewards
 
 ## Architecture
@@ -36,9 +31,6 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `TorqueBatchMinter.sol`: Batch minting for multiple destination chains
 - `TorqueRewards.sol`: Flow-based rewards distribution (referral and cashback)
 - `TorqueFX.sol`: Margin trading extension utilizing the DEX spot liquidity
-- `TorquePayments.sol`: Multi-currency payments with Torque currencies
-- `TorqueMerchant.sol`: Merchant analytics and management dashboard
-- `TorqueGateway.sol`: Merchant payment gateway integration
 - `currencies/`: Currency-specific contracts
 - `engines/`: Currency-specific engines
 

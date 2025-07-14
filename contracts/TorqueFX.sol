@@ -254,6 +254,8 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
         // Execute swap through DEX
         uint256 tokensReceived = dexContract.swap(
+            baseToken,
+            quoteToken,
             isLong ? quoteToken : baseToken,
             requiredTokens,
             0
@@ -279,7 +281,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         bool isLong
     ) internal returns (uint256 positionId) {
         bytes32 pair = keccak256(abi.encodePacked(baseToken, quoteToken));
-        positionId = userTotalExposure[msg.sender]; // Use a counter instead of array length
+        positionId = userTotalExposure[msg.sender];
         positions[msg.sender][pair] = Position({
             collateral: collateral,
             entryPrice: int256(price),
@@ -323,10 +325,10 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             // INTERACTIONS
             if (isLong) {
                 // Hedge by going short in real market
-                ITorqueDEX(dexPools[pair]).swap(address(usdc), hedgeAmount, 0);
+                ITorqueDEX(dexPools[pair]).swap(address(usdc), address(0), address(usdc), hedgeAmount, 0);
             } else {
                 // Hedge by going long in real market
-                ITorqueDEX(dexPools[pair]).swap(address(usdc), hedgeAmount, 0);
+                ITorqueDEX(dexPools[pair]).swap(address(usdc), address(0), address(usdc), hedgeAmount, 0);
             }
 
             emit PositionHedged(pair, hedgeAmount, isLong);
@@ -370,7 +372,7 @@ contract TorqueFX is Ownable, ReentrancyGuard {
 
     function closePosition(
         bytes32 pair
-    ) external returns (uint256 pnl) {
+    ) external nonReentrant returns (uint256 pnl) {
         // CHECKS
         Position storage position = positions[msg.sender][pair];
         require(position.isOpen, "Position closed");
@@ -401,22 +403,31 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         // INTERACTIONS
         // Execute reverse swap through DEX
         uint256 tokensReceived = dexContract.swap(
+            position.baseToken,
+            position.quoteToken,
             position.isLong ? position.baseToken : position.quoteToken,
             tokensToSwap,
             0
         );
 
+        // Calculate fee
+        uint256 fee = (tokensReceived * closeFeeBps) / 10000;
+        uint256 amountAfterFee = tokensReceived - fee;
+
         // Transfer funds back to user
-        if (pnl > 0) {
-            usdc.transfer(msg.sender, pnl);
+        if (amountAfterFee > 0) {
+            require(usdc.transfer(msg.sender, amountAfterFee), "Transfer failed");
+        }
+        if (fee > 0) {
+            require(usdc.transfer(feeRecipient, fee), "Fee transfer failed");
         }
 
         emit PositionClosed(
             msg.sender,
             pair,
             int256(pnl),
-            pnl,
-            0
+            amountAfterFee,
+            fee
         );
     }
 

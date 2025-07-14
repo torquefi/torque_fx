@@ -76,6 +76,4 @@ contract TorqueRouter is Ownable {
         (, int256 price,,,) = priceFeed.latestRoundData();
         return price;
     }
-
-
 }

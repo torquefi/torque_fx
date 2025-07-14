@@ -19,8 +19,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const torqueRewards = await get('TorqueRewards');
   const torqueBatchMinter = await get('TorqueBatchMinter');
   const torqueFX = await get('TorqueFX');
-  const torquePayments = await get('TorquePayments');
-  const torqueGateway = await get('TorqueGateway');
 
   // Get currency contracts
   const currencies = [
@@ -82,7 +80,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`Creating pool for ${currency.symbol}...`);
     
     try {
-      const createPoolTx = await dexContract.createPoolWithDefaults(
+      const createPoolTx = await dexContract.createPoolWithDefaultQuote(
         currency.address,
         `${currency.symbol}/TUSD`,
         `${currency.symbol}TUSD`
@@ -103,11 +101,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const engine = engineContracts[i];
     
     try {
-      const linkCurrencyTx = await batchMinterContract.linkCurrency(currency.address, engine.address);
-      await linkCurrencyTx.wait();
-      console.log(`✅ Linked ${currency.symbol} with ${engine.name}`);
+      // Add currency to supported currencies
+      const addCurrencyTx = await batchMinterContract.addSupportedCurrency(currency.address);
+      await addCurrencyTx.wait();
+      console.log(`✅ Added ${currency.symbol} to supported currencies`);
     } catch (error: any) {
-      console.log(`⚠️  Failed to link ${currency.symbol}:`, error?.message || 'Unknown error');
+      console.log(`⚠️  Failed to add ${currency.symbol}:`, error?.message || 'Unknown error');
     }
   }
 
@@ -116,11 +115,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const stakeContract = await ethers.getContractAt('TorqueStake', torqueStake.address);
 
   try {
-    const setStakingTokenTx = await stakeContract.setStakingToken(torqueUSD.address);
-    await setStakingTokenTx.wait();
-    console.log('✅ TorqueStake linked with TorqueUSD');
+    // TorqueStake is already configured in constructor with TorqueUSD
+    console.log('✅ TorqueStake already linked with TorqueUSD in constructor');
   } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueStake:', error?.message || 'Unknown error');
+    console.log('⚠️  TorqueStake linking issue:', error?.message || 'Unknown error');
   }
 
   // Link TorqueRewards with TorqueUSD
@@ -128,11 +126,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const rewardsContract = await ethers.getContractAt('TorqueRewards', torqueRewards.address);
 
   try {
-    const setRewardTokenTx = await rewardsContract.setRewardToken(torqueUSD.address);
-    await setRewardTokenTx.wait();
-    console.log('✅ TorqueRewards linked with TorqueUSD');
+    // TorqueRewards is already configured in constructor with TorqueUSD
+    console.log('✅ TorqueRewards already linked with TorqueUSD in constructor');
   } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueRewards:', error?.message || 'Unknown error');
+    console.log('⚠️  TorqueRewards linking issue:', error?.message || 'Unknown error');
   }
 
   // Link TorqueRouter with TorqueDEX
@@ -140,11 +137,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const routerContract = await ethers.getContractAt('TorqueRouter', torqueRouter.address);
 
   try {
-    const setDEXTx = await routerContract.setDEX(torqueDEX.address);
-    await setDEXTx.wait();
-    console.log('✅ TorqueRouter linked with TorqueDEX');
+    // TorqueRouter is already configured in constructor with TorqueDEX
+    console.log('✅ TorqueRouter already linked with TorqueDEX in constructor');
   } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueRouter:', error?.message || 'Unknown error');
+    console.log('⚠️  TorqueRouter linking issue:', error?.message || 'Unknown error');
   }
 
   // Link TorqueFX with TorqueDEX
@@ -152,47 +148,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const fxContract = await ethers.getContractAt('TorqueFX', torqueFX.address);
 
   try {
-    const setDEXTx = await fxContract.setDEXPool(ethers.keccak256(ethers.toUtf8Bytes("ETH/USD")), torqueDEX.address);
+    const setDEXTx = await fxContract.setDEXPool(ethers.keccak256(ethers.toUtf8Bytes("TUSD/USD")), torqueDEX.address);
     await setDEXTx.wait();
     console.log('✅ TorqueFX linked with TorqueDEX');
   } catch (error: any) {
     console.log('⚠️  Failed to link TorqueFX:', error?.message || 'Unknown error');
   }
 
-  // Link TorquePayments with TorqueUSD
-  console.log('\n7. Linking TorquePayments...');
-  const paymentsContract = await ethers.getContractAt('TorquePayments', torquePayments.address);
 
-  // Add all Torque currencies as supported
-  const allTorqueCurrencies = [
-    { address: torqueUSD.address, symbol: 'TUSD' },
-    ...currencyContracts.map(currency => ({
-      address: currency.address,
-      symbol: currency.symbol
-    }))
-  ];
-
-  for (const currency of allTorqueCurrencies) {
-    try {
-      const setCurrencyTx = await paymentsContract.setTorqueCurrency(currency.address, true);
-      await setCurrencyTx.wait();
-      console.log(`✅ ${currency.symbol} added as supported currency`);
-    } catch (error: any) {
-      console.log(`⚠️  Failed to add ${currency.symbol}:`, error?.message || 'Unknown error');
-    }
-  }
-
-  // Link TorqueGateway with TorquePayments
-  console.log('\n8. Linking TorqueGateway...');
-  const gatewayContract = await ethers.getContractAt('TorqueGateway', torqueGateway.address);
-
-  try {
-    const setPaymentsTx = await gatewayContract.setPaymentsContract(torquePayments.address);
-    await setPaymentsTx.wait();
-    console.log('✅ TorqueGateway linked with TorquePayments');
-  } catch (error: any) {
-    console.log('⚠️  Failed to link TorqueGateway:', error?.message || 'Unknown error');
-  }
 
   console.log('\n✅ Contract linking completed!');
   console.log('\n📋 Linking Summary:');
@@ -205,8 +168,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
   console.log(`  TorqueRouter: ${torqueRouter.address}`);
   console.log(`  TorqueFX: ${torqueFX.address}`);
-  console.log(`  TorquePayments: ${torquePayments.address}`);
-  console.log(`  TorqueGateway: ${torqueGateway.address}`);
   console.log(`\nCurrency Pools Created:`);
   currencyContracts.forEach(currency => {
     console.log(`  ${currency.symbol}/TUSD pool`);

@@ -2,25 +2,29 @@
 pragma solidity 0.8.28;
 
 interface ITorqueDEX {
-    function depositLiquidity(address token, uint256 amount) external;
-    function withdrawLiquidity(address token, uint256 amount) external;
-    function openPosition(
-        address user,
+    function swap(
         address baseToken,
         address quoteToken,
-        uint256 baseAmount,
-        uint256 leverage
-    ) external returns (uint256 positionId);
-    function closePosition(uint256 positionId) external;
-    function getPosition(uint256 positionId) external view returns (
-        address user,
-        address baseToken,
-        address quoteToken,
-        uint256 baseAmount,
-        uint256 leverage,
-        uint256 entryPrice,
-        uint256 currentPrice
-    );
-    function swap(address tokenIn, uint256 amountIn) external returns (uint256 amountOut);
+        address tokenIn,
+        uint256 amountIn,
+        uint256 minAmountOut
+    ) external returns (uint256 amountOut);
+    
     function getPrice(address baseToken, address quoteToken) external view returns (uint256 price);
+    
+    function addLiquidity(
+        address baseToken,
+        address quoteToken,
+        uint256 amount0,
+        uint256 amount1,
+        int256 lowerTick,
+        int256 upperTick
+    ) external returns (uint256 liquidity);
+    
+    function removeLiquidity(
+        address baseToken,
+        address quoteToken,
+        uint256 liquidity,
+        uint256 rangeIndex
+    ) external returns (uint256 amount0, uint256 amount1);
 } 
