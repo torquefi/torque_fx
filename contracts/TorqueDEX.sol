@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -43,6 +43,20 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         mapping(address => mapping(uint256 => Range[])) userRanges;
         int256 currentTick;
         uint256 currentSqrtPriceX96;
+        
+        // Volume and fee tracking
+        uint256 volume24h;
+        uint256 volume7d;
+        uint256 volume30d;
+        uint256 fees24h;
+        uint256 fees7d;
+        uint256 fees30d;
+        uint256 lastVolumeUpdate;
+        uint256 lastFeeUpdate;
+        
+        // Participant tracking
+        uint256 totalParticipants;
+        mapping(address => bool) participants;
     }
     
     struct Tick {
@@ -131,6 +145,12 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint16 srcChainId,
         string reason
     );
+
+    // Volume tracking events
+    event VolumeUpdated(address indexed baseToken, address indexed quoteToken, uint256 volume24h, uint256 volume7d, uint256 volume30d);
+    event FeesUpdated(address indexed baseToken, address indexed quoteToken, uint256 fees24h, uint256 fees7d, uint256 fees30d);
+    event ParticipantAdded(address indexed baseToken, address indexed quoteToken, address indexed participant);
+    event ParticipantRemoved(address indexed baseToken, address indexed quoteToken, address indexed participant);
 
     // Errors
     error TorqueDEX__DefaultQuoteAssetNotSet();
@@ -383,6 +403,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             IERC20(tokenIn).transfer(pool.feeRecipient, fee);
         }
         
+        // Update volume and fee statistics
+        _updateVolumeStats(pool, amountIn);
+        _updateFeeStats(pool, fee);
+        
         emit SwapExecuted(msg.sender, baseToken, quoteToken, tokenIn, amountIn, tokenOut, amountOut);
         
         return amountOut;
@@ -429,6 +453,9 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         pool.userRanges[msg.sender][rangeIndex].push(newRange);
         userRangeCount[msg.sender]++;
         
+        // Add participant tracking
+        _addParticipant(pool, msg.sender);
+        
         // Mint LP tokens
         TorqueLP(pool.lpToken).mint(msg.sender, liquidity);
         
@@ -461,17 +488,17 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         require(ranges.length > 0, "No ranges found");
         
         // Find the range with sufficient liquidity
-        uint256 rangeIndex = 0;
+        uint256 foundRangeIndex = 0;
         bool rangeFound = false;
         for (uint256 i = 0; i < ranges.length; i++) {
             if (ranges[i].liquidity >= liquidity) {
-                rangeIndex = i;
+                foundRangeIndex = i;
                 rangeFound = true;
                 break;
             }
         }
         require(rangeFound, "Insufficient liquidity in any range");
-        Range storage range = ranges[rangeIndex];
+        Range storage range = ranges[foundRangeIndex];
         
         // Calculate amounts based on liquidity proportion
         amount0 = (range.amount0 * liquidity) / range.liquidity;
@@ -1256,32 +1283,25 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Get user ranges for a specific pool
+     * @dev Internal function to get user ranges for a specific pool
      */
-    function getUserRanges(
+    function _getUserRanges(
         address user,
         address baseToken,
         address quoteToken
-    ) external view returns (Range[] memory) {
+    ) internal view returns (Range[] memory) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
         }
-        
         uint256 totalRanges = 0;
         uint256 userRangeCountValue = userRangeCount[user];
-        
-        // Count total ranges
         for (uint256 i = 0; i < userRangeCountValue; i++) {
             totalRanges += pool.userRanges[user][i].length;
         }
-        
-        // Create result array
         Range[] memory ranges = new Range[](totalRanges);
         uint256 currentIndex = 0;
-        
-        // Fill result array
         for (uint256 i = 0; i < userRangeCountValue; i++) {
             Range[] storage userRanges = pool.userRanges[user][i];
             for (uint256 j = 0; j < userRanges.length; j++) {
@@ -1289,8 +1309,44 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 currentIndex++;
             }
         }
-        
         return ranges;
+    }
+    /**
+     * @dev External wrapper for getUserRanges
+     */
+    function getUserRanges(
+        address user,
+        address baseToken,
+        address quoteToken
+    ) external view returns (Range[] memory) {
+        return _getUserRanges(user, baseToken, quoteToken);
+    }
+    /**
+     * @dev Internal function to get current price for a token pair
+     */
+    function _getPrice(address baseToken, address quoteToken) internal view returns (uint256 price) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
+        Pool storage pool = pools[pairHash];
+        if (!pool.active) {
+            revert TorqueDEX__PoolNotFound();
+        }
+        uint256 reserve0 = IERC20(pool.baseToken).balanceOf(address(this));
+        uint256 reserve1 = IERC20(pool.quoteToken).balanceOf(address(this));
+        if (reserve0 == 0 || reserve1 == 0) {
+            revert TorqueDEX__InsufficientLiquidity();
+        }
+        if (pool.baseToken == baseToken) {
+            price = (reserve1 * 1e18) / reserve0;
+        } else {
+            price = (reserve0 * 1e18) / reserve1;
+        }
+        return price;
+    }
+    /**
+     * @dev External wrapper for getPrice
+     */
+    function getPrice(address baseToken, address quoteToken) external view returns (uint256 price) {
+        return _getPrice(baseToken, quoteToken);
     }
     
     /**
@@ -1322,32 +1378,391 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Get current price for a token pair
-     * Returns price in quote token units per base token (scaled by 1e18)
+     * @dev Update volume statistics for a pool
+     * Called internally after swaps
      */
-    function getPrice(address baseToken, address quoteToken) external view returns (uint256 price) {
+    function _updateVolumeStats(
+        Pool storage pool,
+        uint256 volumeAmount
+    ) internal {
+        uint256 currentTime = block.timestamp;
+        
+        // Update 24h volume (rolling window)
+        if (currentTime - pool.lastVolumeUpdate >= 1 days) {
+            pool.volume24h = volumeAmount;
+        } else {
+            pool.volume24h += volumeAmount;
+        }
+        
+        // Update 7d volume (rolling window)
+        if (currentTime - pool.lastVolumeUpdate >= 7 days) {
+            pool.volume7d = volumeAmount;
+        } else {
+            pool.volume7d += volumeAmount;
+        }
+        
+        // Update 30d volume (rolling window)
+        if (currentTime - pool.lastVolumeUpdate >= 30 days) {
+            pool.volume30d = volumeAmount;
+        } else {
+            pool.volume30d += volumeAmount;
+        }
+        
+        pool.lastVolumeUpdate = currentTime;
+        
+        emit VolumeUpdated(pool.baseToken, pool.quoteToken, pool.volume24h, pool.volume7d, pool.volume30d);
+    }
+
+    /**
+     * @dev Update fee statistics for a pool
+     * Called internally after swaps
+     */
+    function _updateFeeStats(
+        Pool storage pool,
+        uint256 feeAmount
+    ) internal {
+        uint256 currentTime = block.timestamp;
+        
+        // Update 24h fees (rolling window)
+        if (currentTime - pool.lastFeeUpdate >= 1 days) {
+            pool.fees24h = feeAmount;
+        } else {
+            pool.fees24h += feeAmount;
+        }
+        
+        // Update 7d fees (rolling window)
+        if (currentTime - pool.lastFeeUpdate >= 7 days) {
+            pool.fees7d = feeAmount;
+        } else {
+            pool.fees7d += feeAmount;
+        }
+        
+        // Update 30d fees (rolling window)
+        if (currentTime - pool.lastFeeUpdate >= 30 days) {
+            pool.fees30d = feeAmount;
+        } else {
+            pool.fees30d += feeAmount;
+        }
+        
+        pool.lastFeeUpdate = currentTime;
+        
+        emit FeesUpdated(pool.baseToken, pool.quoteToken, pool.fees24h, pool.fees7d, pool.fees30d);
+    }
+
+    /**
+     * @dev Add participant to pool
+     * Called internally when user adds liquidity
+     */
+    function _addParticipant(
+        Pool storage pool,
+        address participant
+    ) internal {
+        if (!pool.participants[participant]) {
+            pool.participants[participant] = true;
+            pool.totalParticipants++;
+            emit ParticipantAdded(pool.baseToken, pool.quoteToken, participant);
+        }
+    }
+
+    /**
+     * @dev Remove participant from pool
+     * Called internally when user removes all liquidity
+     */
+    function _removeParticipant(
+        Pool storage pool,
+        address participant
+    ) internal {
+        if (pool.participants[participant]) {
+            pool.participants[participant] = false;
+            pool.totalParticipants--;
+            emit ParticipantRemoved(pool.baseToken, pool.quoteToken, participant);
+        }
+    }
+
+    /**
+     * @dev Get comprehensive pool statistics for frontend
+     */
+    function getPoolStats(address baseToken, address quoteToken) external view returns (
+        uint256 volume24h,
+        uint256 volume7d,
+        uint256 volume30d,
+        uint256 fees24h,
+        uint256 fees7d,
+        uint256 fees30d,
+        uint256 totalParticipants,
+        uint256 currentPrice,
+        uint256 totalLiquidity
+    ) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
         if (!pool.active) {
             revert TorqueDEX__PoolNotFound();
         }
         
+        volume24h = pool.volume24h;
+        volume7d = pool.volume7d;
+        volume30d = pool.volume30d;
+        fees24h = pool.fees24h;
+        fees7d = pool.fees7d;
+        fees30d = pool.fees30d;
+        totalParticipants = pool.totalParticipants;
+        totalLiquidity = pool.totalLiquidity;
+        
+        // Get current price
         uint256 reserve0 = IERC20(pool.baseToken).balanceOf(address(this));
         uint256 reserve1 = IERC20(pool.quoteToken).balanceOf(address(this));
         
-        if (reserve0 == 0 || reserve1 == 0) {
-            revert TorqueDEX__InsufficientLiquidity();
+        if (reserve0 > 0 && reserve1 > 0) {
+            if (pool.baseToken == baseToken) {
+                currentPrice = (reserve1 * 1e18) / reserve0;
+            } else {
+                currentPrice = (reserve0 * 1e18) / reserve1;
+            }
+        }
+    }
+
+    /**
+     * @dev Get user's pool participation status
+     */
+    function isPoolParticipant(address baseToken, address quoteToken, address user) external view returns (bool) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
+        Pool storage pool = pools[pairHash];
+        if (!pool.active) {
+            revert TorqueDEX__PoolNotFound();
+        }
+        return pool.participants[user];
+    }
+
+
+
+    /**
+     * @dev Calculate APR for a pool based on recent fees and volume
+     */
+    function getPoolAPR(
+        address baseToken,
+        address quoteToken,
+        uint256 period
+    ) external view returns (uint256 apr) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
+        Pool storage pool = pools[pairHash];
+        if (!pool.active) {
+            revert TorqueDEX__PoolNotFound();
         }
         
-        // Calculate price: quote token per base token
-        if (pool.baseToken == baseToken) {
-            // Base token is token0, quote token is token1
-            price = (reserve1 * 1e18) / reserve0;
+        uint256 fees;
+        uint256 volume;
+        
+        if (period == 7 days) {
+            fees = pool.fees7d;
+            volume = pool.volume7d;
+        } else if (period == 30 days) {
+            fees = pool.fees30d;
+            volume = pool.volume30d;
         } else {
-            // Base token is token1, quote token is token0
-            price = (reserve0 * 1e18) / reserve1;
+            fees = pool.fees24h;
+            volume = pool.volume24h;
         }
         
-        return price;
+        if (volume == 0 || pool.totalLiquidity == 0) {
+            return 0;
+        }
+        
+        // Calculate APR: (fees / totalLiquidity) * (365 days / period) * 10000
+        apr = (fees * 365 days * 10000) / (pool.totalLiquidity * period);
+    }
+
+    /**
+     * @dev Get cross-chain liquidity distribution for a user
+     */
+    function getCrossChainLiquidityDistribution(
+        address user,
+        address baseToken,
+        address quoteToken
+    ) external view returns (
+        uint16[] memory chainIds,
+        uint256[] memory amounts,
+        uint256 totalAmount
+    ) {
+        // Get all supported chains
+        uint256 supportedChainCount = 0;
+        for (uint16 i = 1; i <= 1000; i++) { // Reasonable chain ID range
+            if (supportedChainIds[i]) {
+                supportedChainCount++;
+            }
+        }
+        
+        chainIds = new uint16[](supportedChainCount);
+        amounts = new uint256[](supportedChainCount);
+        
+        uint256 index = 0;
+        for (uint16 i = 1; i <= 1000; i++) {
+            if (supportedChainIds[i]) {
+                chainIds[index] = i;
+                // Note: This would require cross-chain queries in a real implementation
+                // For now, return 0 as placeholder
+                amounts[index] = 0;
+                totalAmount += amounts[index];
+                index++;
+            }
+        }
+    }
+
+    /**
+     * @dev Get supported chains for cross-chain operations
+     */
+    function getSupportedChains() external view returns (
+        uint16[] memory chainIds,
+        address[] memory chainDexAddresses
+    ) {
+        uint256 supportedChainCount = 0;
+        for (uint16 i = 1; i <= 1000; i++) {
+            if (supportedChainIds[i]) {
+                supportedChainCount++;
+            }
+        }
+        
+        chainIds = new uint16[](supportedChainCount);
+        chainDexAddresses = new address[](supportedChainCount);
+        
+        uint256 index = 0;
+        for (uint16 i = 1; i <= 1000; i++) {
+            if (supportedChainIds[i]) {
+                chainIds[index] = i;
+                chainDexAddresses[index] = dexAddresses[i];
+                index++;
+            }
+        }
+    }
+
+    /**
+     * @dev Get pool risk assessment for frontend
+     */
+    function getPoolRiskAssessment(
+        address baseToken,
+        address quoteToken
+    ) external view returns (
+        string memory riskLevel,
+        uint256 volatilityRisk,
+        uint256 liquidityRisk
+    ) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
+        Pool storage pool = pools[pairHash];
+        if (!pool.active) {
+            revert TorqueDEX__PoolNotFound();
+        }
+        
+        // Determine risk level based on pool characteristics
+        if (pool.isStablePair) {
+            riskLevel = "Low";
+            volatilityRisk = 500; // 5% in basis points
+            liquidityRisk = 200;  // 2% in basis points
+        } else {
+            riskLevel = "High";
+            volatilityRisk = 2000; // 20% in basis points
+            liquidityRisk = 1000;  // 10% in basis points
+        }
+        
+        // Adjust based on liquidity depth
+        if (pool.totalLiquidity < 1000e18) { // Less than 1000 tokens
+            liquidityRisk = 1500; // 15% in basis points
+        }
+    }
+
+    /**
+     * @dev Get comprehensive user position data for a specific pool
+     */
+    function getUserPosition(
+        address baseToken,
+        address quoteToken,
+        address user
+    ) external view returns (
+        uint256 totalLiquidity,
+        uint256 lpTokens,
+        uint256 token0Balance,
+        uint256 token1Balance,
+        Range[] memory ranges,
+        bool isParticipant
+    ) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
+        Pool storage pool = pools[pairHash];
+        if (!pool.active) {
+            revert TorqueDEX__PoolNotFound();
+        }
+        
+        // Get user ranges
+        ranges = _getUserRanges(user, baseToken, quoteToken);
+        
+        // Calculate total liquidity and balances
+        totalLiquidity = 0;
+        token0Balance = 0;
+        token1Balance = 0;
+        
+        for (uint256 i = 0; i < ranges.length; i++) {
+            totalLiquidity += ranges[i].liquidity;
+            token0Balance += ranges[i].amount0;
+            token1Balance += ranges[i].amount1;
+        }
+        
+        // Get LP token balance
+        lpTokens = TorqueLP(pool.lpToken).balanceOf(user);
+        isParticipant = pool.participants[user];
+    }
+
+    /**
+     * @dev Get user's total liquidity across all pools
+     */
+    function getUserTotalLiquidity(address user) external view returns (
+        uint256 totalLiquidity,
+        uint256 totalLpTokens,
+        address[] memory poolAddresses,
+        uint256[] memory poolLiquidity
+    ) {
+        uint256 poolCount = allPools.length;
+        poolAddresses = new address[](poolCount);
+        poolLiquidity = new uint256[](poolCount);
+        
+        for (uint256 i = 0; i < poolCount; i++) {
+            address lpToken = allPools[i];
+            poolAddresses[i] = lpToken;
+            
+            uint256 userLpBalance = TorqueLP(lpToken).balanceOf(user);
+            poolLiquidity[i] = userLpBalance;
+            totalLpTokens += userLpBalance;
+            
+            // Estimate liquidity value (simplified)
+            totalLiquidity += userLpBalance;
+        }
+    }
+
+    /**
+     * @dev Get pool price range information for concentrated liquidity
+     */
+    function getPoolPriceRange(
+        address baseToken,
+        address quoteToken
+    ) external view returns (
+        uint256 minPrice,
+        uint256 maxPrice,
+        uint256 currentPrice,
+        bool isStablePair
+    ) {
+        bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
+        Pool storage pool = pools[pairHash];
+        if (!pool.active) {
+            revert TorqueDEX__PoolNotFound();
+        }
+        
+        isStablePair = pool.isStablePair;
+        currentPrice = _getPrice(baseToken, quoteToken);
+        
+        // For stable pairs, use a reasonable range around current price
+        if (isStablePair) {
+            minPrice = (currentPrice * 95) / 100; // 5% below current price
+            maxPrice = (currentPrice * 105) / 100; // 5% above current price
+        } else {
+            // For volatile pairs, use a wider range
+            minPrice = (currentPrice * 80) / 100; // 20% below current price
+            maxPrice = (currentPrice * 120) / 100; // 20% above current price
+        }
     }
 }

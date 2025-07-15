@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/OFT.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";

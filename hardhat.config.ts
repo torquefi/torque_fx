@@ -9,7 +9,7 @@ import { EndpointId } from '@layerzerolabs/lz-definitions';
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.28",
+    version: "0.8.30",
     settings: {
       viaIR: true,
       optimizer: {

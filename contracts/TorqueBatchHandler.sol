@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 import "./engines/TorqueEngine.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { OApp } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Origin, MessagingFee } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title TorqueBatchHandler
  * @dev Allows users to mint, burn, and redeem Torque tokens across multiple destination chains in a single transaction
  */
-contract TorqueBatchHandler is OApp, Ownable, ReentrancyGuard {
+contract TorqueBatchHandler is OApp, ReentrancyGuard {
     
     // State variables
     uint256 public maxBatchSize = 50;
@@ -97,7 +97,7 @@ contract TorqueBatchHandler is OApp, Ownable, ReentrancyGuard {
     constructor(
         address _lzEndpoint,
         address _owner
-    ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
+    ) OApp(_lzEndpoint, _owner) {
         supportedChainIds[ETHEREUM_CHAIN_ID] = true;
         supportedChainIds[ARBITRUM_CHAIN_ID] = true;
         supportedChainIds[OPTIMISM_CHAIN_ID] = true;
@@ -440,7 +440,7 @@ contract TorqueBatchHandler is OApp, Ownable, ReentrancyGuard {
      */
     function _estimateGasForMessage(
         uint16 dstChainId,
-        bytes calldata adapterParams
+        bytes memory adapterParams
     ) internal view returns (uint256) {
         // This will integrate with LayerZero's gas estimation
         // For now, return a conservative estimate
@@ -478,6 +478,159 @@ contract TorqueBatchHandler is OApp, Ownable, ReentrancyGuard {
     function setMaxBatchSize(uint256 newMaxBatchSize) external onlyOwner {
         require(newMaxBatchSize > 0 && newMaxBatchSize <= 100, "Invalid batch size");
         maxBatchSize = newMaxBatchSize;
+    }
+
+    /**
+     * @dev Get comprehensive batch minting information for frontend
+     */
+    function getBatchMintInfo(
+        address currency,
+        uint256 amount,
+        uint16[] calldata dstChainIds
+    ) external view returns (
+        uint256 totalGasEstimate,
+        uint256[] memory gasEstimates,
+        uint256 collateralRequired,
+        uint256[] memory amountsPerChain,
+        bool[] memory isSupported,
+        string[] memory chainNames
+    ) {
+        totalGasEstimate = 0;
+        gasEstimates = new uint256[](dstChainIds.length);
+        amountsPerChain = new uint256[](dstChainIds.length);
+        isSupported = new bool[](dstChainIds.length);
+        chainNames = new string[](dstChainIds.length);
+        
+        // Calculate amounts per chain (equal distribution for now)
+        uint256 amountPerChain = amount / dstChainIds.length;
+        uint256 remainder = amount % dstChainIds.length;
+        
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            amountsPerChain[i] = amountPerChain + (i < remainder ? 1 : 0);
+            isSupported[i] = supportedChainIds[dstChainIds[i]];
+            chainNames[i] = _getChainName(dstChainIds[i]);
+            
+            if (isSupported[i]) {
+                bytes memory emptyParams = "";
+                gasEstimates[i] = _estimateGasForMessage(dstChainIds[i], emptyParams);
+                totalGasEstimate += gasEstimates[i];
+            }
+        }
+        
+        // Calculate collateral required (102% of amount)
+        collateralRequired = (amount * 102) / 100;
+    }
+
+    /**
+     * @dev Get user's cross-chain positions
+     */
+    function getUserCrossChainPositions(address user) external view returns (
+        address[] memory currencies,
+        uint16[] memory chainIds,
+        uint256[] memory amounts,
+        uint256[] memory collateralValues,
+        uint256 totalValue
+    ) {
+        // This would track user's positions across all chains
+        // For now, return empty arrays
+        currencies = new address[](0);
+        chainIds = new uint16[](0);
+        amounts = new uint256[](0);
+        collateralValues = new uint256[](0);
+        totalValue = 0;
+    }
+
+    /**
+     * @dev Get supported currencies with their information
+     */
+    function getSupportedCurrenciesInfo() external view returns (
+        address[] memory currencies,
+        string[] memory symbols,
+        string[] memory names,
+        bool[] memory isActive
+    ) {
+        // For now, return empty arrays as we don't have a way to iterate through supported currencies
+        currencies = new address[](0);
+        symbols = new string[](0);
+        names = new string[](0);
+        isActive = new bool[](0);
+    }
+
+    /**
+     * @dev Get engine addresses for a currency across all chains
+     */
+    function getEngineAddresses(address currency) external view returns (
+        uint16[] memory chainIds,
+        address[] memory engineAddresses,
+        bool[] memory isActive
+    ) {
+        uint256 count = 0;
+        for (uint16 i = 1; i <= 1000; i++) {
+            if (this.engineAddresses(currency, i) != address(0)) {
+                count++;
+            }
+        }
+        
+        chainIds = new uint16[](count);
+        engineAddresses = new address[](count);
+        isActive = new bool[](count);
+        
+        uint256 index = 0;
+        for (uint16 i = 1; i <= 1000; i++) {
+            address engineAddr = this.engineAddresses(currency, i);
+            if (engineAddr != address(0)) {
+                chainIds[index] = i;
+                engineAddresses[index] = engineAddr;
+                isActive[index] = true;
+                index++;
+            }
+        }
+    }
+
+    /**
+     * @dev Get batch minting statistics
+     */
+    function getBatchMintStats() external view returns (
+        uint256 totalBatches,
+        uint256 totalVolume,
+        uint256 totalGasUsed,
+        uint256 averageBatchSize,
+        uint256 successRate
+    ) {
+        // This would track batch minting statistics
+        // For now, return placeholder values
+        totalBatches = 0;
+        totalVolume = 0;
+        totalGasUsed = 0;
+        averageBatchSize = 0;
+        successRate = 100; // 100% success rate
+    }
+
+    // Internal helper functions
+    function _getChainName(uint16 chainId) internal pure returns (string memory) {
+        if (chainId == ETHEREUM_CHAIN_ID) return "Ethereum";
+        if (chainId == ARBITRUM_CHAIN_ID) return "Arbitrum";
+        if (chainId == OPTIMISM_CHAIN_ID) return "Optimism";
+        if (chainId == POLYGON_CHAIN_ID) return "Polygon";
+        if (chainId == BASE_CHAIN_ID) return "Base";
+        if (chainId == SONIC_CHAIN_ID) return "Sonic";
+        if (chainId == ABSTRACT_CHAIN_ID) return "Abstract";
+        if (chainId == BSC_CHAIN_ID) return "BSC";
+        if (chainId == FRAXTAL_CHAIN_ID) return "Fraxtal";
+        if (chainId == AVALANCHE_CHAIN_ID) return "Avalanche";
+        return "Unknown";
+    }
+
+    function _getCurrencySymbol(address currency) internal pure returns (string memory) {
+        // This would map currency addresses to symbols
+        // For now, return a placeholder
+        return "TORQUE";
+    }
+
+    function _getCurrencyName(address currency) internal pure returns (string memory) {
+        // This would map currency addresses to names
+        // For now, return a placeholder
+        return "Torque Token";
     }
     
     /**
