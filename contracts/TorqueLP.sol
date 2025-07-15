@@ -9,6 +9,13 @@ contract TorqueLP is OFT {
 
     event DEXUpdated(address indexed oldDex, address indexed newDex);
 
+    // Events for tracking supply changes
+    event SupplyMinted(address indexed to, uint256 amount, uint256 newTotalSupply);
+    event SupplyBurned(address indexed from, uint256 amount, uint256 newTotalSupply);
+    
+    // Internal tracking of total supply
+    uint256 private _totalSupply;
+
     constructor(
         string memory _name,
         string memory _symbol,
@@ -25,41 +32,29 @@ contract TorqueLP is OFT {
 
     function mint(address to, uint256 amount) external {
         require(msg.sender == dex, "Only DEX can mint");
-        _mint(to, amount);
+        super._mint(to, amount);
         _totalSupply += amount;
         emit SupplyMinted(to, amount, _totalSupply);
     }
 
     function burn(address from, uint256 amount) external {
         require(msg.sender == dex, "Only DEX can burn");
-        _burn(from, amount);
+        super._burn(from, amount);
         _totalSupply -= amount;
         emit SupplyBurned(from, amount, _totalSupply);
     }
-
-    // Events for tracking supply changes
-    event SupplyMinted(address indexed to, uint256 amount, uint256 newTotalSupply);
-    event SupplyBurned(address indexed from, uint256 amount, uint256 newTotalSupply);
-    
-    // Internal tracking of total supply
-    uint256 private _totalSupply;
 
     /**
      * @dev Get LP token statistics for frontend
      */
     function getLPStats() external view returns (
         uint256 supply,
-        uint256 totalHolders,
         string memory tokenName,
         string memory tokenSymbol
     ) {
         supply = _totalSupply;
         tokenName = name();
         tokenSymbol = symbol();
-        
-        // Note: totalHolders would require additional tracking
-        // For now, return 0 as it's not easily calculable without events
-        totalHolders = 0;
     }
 
     /**
@@ -98,33 +93,15 @@ contract TorqueLP is OFT {
     }
 
     /**
-     * @dev Override _mint to track supply for cross-chain operations
-     */
-    function _mint(address to, uint256 amount) internal virtual override {
-        super._mint(to, amount);
-        _totalSupply += amount;
-        emit SupplyMinted(to, amount, _totalSupply);
-    }
-
-    /**
-     * @dev Override _burn to track supply for cross-chain operations
-     */
-    function _burn(address from, uint256 amount) internal virtual override {
-        super._burn(from, amount);
-        _totalSupply -= amount;
-        emit SupplyBurned(from, amount, _totalSupply);
-    }
-
-    /**
      * @dev Get cross-chain supply information
      */
     function getCrossChainSupplyInfo() external view returns (
         uint256 localSupply,
-        uint256 totalSupply,
+        uint256 crossChainTotalSupply,
         bool isCrossChainEnabled
     ) {
         localSupply = _totalSupply;
-        totalSupply = _totalSupply; // For now, same as local. Could be enhanced for cross-chain tracking
+        crossChainTotalSupply = _totalSupply; // For now, same as local. Could be enhanced for cross-chain tracking
         isCrossChainEnabled = true; // OFT enables cross-chain functionality
     }
 }

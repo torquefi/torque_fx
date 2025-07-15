@@ -84,7 +84,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
     constructor(
         address _lzEndpoint,
         address _owner
-    ) OApp(_lzEndpoint, _owner) {
+    ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
         supportedChainIds[ETHEREUM_CHAIN_ID] = true;
         supportedChainIds[ARBITRUM_CHAIN_ID] = true;
         supportedChainIds[OPTIMISM_CHAIN_ID] = true;
@@ -482,7 +482,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
      */
     function getEngineAddresses(address currency) external view returns (
         uint16[] memory chainIds,
-        address[] memory engineAddresses,
+        address[] memory engineAddressList,
         bool[] memory isActive
     ) {
         uint256 count = 0;
@@ -493,7 +493,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         }
         
         chainIds = new uint16[](count);
-        engineAddresses = new address[](count);
+        engineAddressList = new address[](count);
         isActive = new bool[](count);
         
         uint256 index = 0;
@@ -501,7 +501,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
             address engineAddr = this.engineAddresses(currency, i);
             if (engineAddr != address(0)) {
                 chainIds[index] = i;
-                engineAddresses[index] = engineAddr;
+                engineAddressList[index] = engineAddr;
                 isActive[index] = true;
                 index++;
             }
