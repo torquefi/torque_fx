@@ -395,9 +395,9 @@ export const TESTNET_DEPLOYMENTS: Record<string, DeploymentConfig> = {
     deployed: false,
   },
 
-  baseGoerli: {
-    chainId: 84531,
-    network: 'base-goerli',
+  baseSepolia: {
+    chainId: 84532,
+    network: 'base-sepolia',
     addresses: {
       torqueFX: '0x0000000000000000000000000000000000000000',
       torqueRouter: '0x0000000000000000000000000000000000000000',

@@ -307,22 +307,22 @@ export const CHAINS: Record<string, ChainConfig> = {
     testnet: true,
   },
 
-  baseGoerli: {
-    id: 84531,
-    name: 'Base Goerli',
-    network: 'base-goerli',
+  baseSepolia: {
+    id: 84532,
+    name: 'Base Sepolia',
+    network: 'base-sepolia',
     nativeCurrency: {
-      name: 'Goerli Ether',
+      name: 'Sepolia Ether',
       symbol: 'ETH',
       decimals: 18,
     },
     rpcUrls: {
-      http: ['https://goerli.base.org'],
+      http: ['https://sepolia.base.org'],
     },
     blockExplorers: {
-      name: 'Base Goerli BaseScan',
-      url: 'https://goerli.basescan.org',
-      apiUrl: 'https://api-goerli.basescan.org',
+      name: 'Base Sepolia BaseScan',
+      url: 'https://sepolia.basescan.org',
+      apiUrl: 'https://api-sepolia.basescan.org',
     },
     layerZero: {
       endpointId: EndpointId.BASE_TESTNET,

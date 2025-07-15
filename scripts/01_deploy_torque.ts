@@ -245,7 +245,7 @@ async function getLZEndpoint(chainId?: number): Promise<string> {
     // Testnet
     11155111: '0xae92d5aD7583AD66E49A0c67BAd18F6ba52dDDc1', // Sepolia
     421613: '0x6EDCE65403992e310A62460808c4b910D972f10f', // Arbitrum Sepolia
-    84531: '0x6EDCE65403992e310A62460808c4b910D972f10f', // Base Goerli
+    84532: '0x6EDCE65403992e310A62460808c4b910D972f10f', // Base Sepolia
   };
 
   const endpoint = endpoints[chainId];
