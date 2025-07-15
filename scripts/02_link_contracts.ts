@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const torqueRouter = await get('TorqueRouter');
   const torqueStake = await get('TorqueStake');
   const torqueRewards = await get('TorqueRewards');
-  const torqueBatchMinter = await get('TorqueBatchMinter');
+  const torqueBatchHandler = await get('TorqueBatchHandler');
   const torqueFX = await get('TorqueFX');
 
   // Get currency contracts
@@ -92,9 +92,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   }
 
-  // Link TorqueBatchMinter with currencies and engines
-  console.log('\n2. Linking TorqueBatchMinter...');
-  const batchMinterContract = await ethers.getContractAt('TorqueBatchMinter', torqueBatchMinter.address);
+  // Link TorqueBatchHandler with currencies and engines
+  console.log('\n2. Linking TorqueBatchHandler...');
+  const batchHandlerContract = await ethers.getContractAt('TorqueBatchHandler', torqueBatchHandler.address);
 
   for (let i = 0; i < currencyContracts.length; i++) {
     const currency = currencyContracts[i];
@@ -102,7 +102,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     
     try {
       // Add currency to supported currencies
-      const addCurrencyTx = await batchMinterContract.addSupportedCurrency(currency.address);
+      const addCurrencyTx = await batchHandlerContract.addSupportedCurrency(currency.address);
       await addCurrencyTx.wait();
       console.log(`✅ Added ${currency.symbol} to supported currencies`);
     } catch (error: any) {
@@ -163,7 +163,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`Deployer: ${deployer}`);
   console.log(`\nLinked Contracts:`);
   console.log(`  TorqueDEX: ${torqueDEX.address}`);
-  console.log(`  TorqueBatchMinter: ${torqueBatchMinter.address}`);
+  console.log(`  TorqueBatchHandler: ${torqueBatchHandler.address}`);
   console.log(`  TorqueStake: ${torqueStake.address}`);
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
   console.log(`  TorqueRouter: ${torqueRouter.address}`);

@@ -143,15 +143,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
   console.log(`TorqueStake deployed to: ${torqueStake.address}`);
 
-  // Deploy TorqueBatchMinter
-  console.log('\n10. Deploying TorqueBatchMinter...');
-  const torqueBatchMinter = await deploy('TorqueBatchMinter', {
+  // Deploy TorqueBatchHandler
+  console.log('\n10. Deploying TorqueBatchHandler...');
+  const torqueBatchHandler = await deploy('TorqueBatchHandler', {
     from: deployer,
     args: [lzEndpoint, deployer],
     log: true,
     waitConfirmations: 1,
   });
-  console.log(`TorqueBatchMinter deployed to: ${torqueBatchMinter.address}`);
+  console.log(`TorqueBatchHandler deployed to: ${torqueBatchHandler.address}`);
 
   // Deploy TorqueFX (main trading contract)
   console.log('\n11. Deploying TorqueFX...');
@@ -186,7 +186,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`  TorqueStake: ${torqueStake.address}`);
   console.log(`  TorqueFX: ${torqueFX.address}`);
   console.log(`  TorqueRewards: ${torqueRewards.address}`);
-  console.log(`  TorqueBatchMinter: ${torqueBatchMinter.address}`);
+  console.log(`  TorqueBatchHandler: ${torqueBatchHandler.address}`);
   console.log(`\nCurrency Tokens:`);
   deployedCurrencies.forEach(currency => {
     console.log(`  ${currency.symbol}: ${currency.address}`);
@@ -209,7 +209,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       torqueStake: torqueStake.address,
       torqueFX: torqueFX.address,
       torqueRewards: torqueRewards.address,
-      torqueBatchMinter: torqueBatchMinter.address,
+      torqueBatchHandler: torqueBatchHandler.address,
       currencies: deployedCurrencies,
       engines: deployedEngines,
     },

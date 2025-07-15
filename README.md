@@ -28,7 +28,7 @@ Torque is a high-performance decentralized exchange (DEX) enabling foreign excha
 - `TorqueLP.sol`: LP token contract for DEX liquidity positions
 - `TorqueRouter.sol`: Trading pair and price feed management
 - `TorqueStake.sol`: Staking for LP and TORQ tokens with lock periods
-- `TorqueBatchMinter.sol`: Batch minting for multiple destination chains
+- `TorqueBatchHandler.sol`: Batch minting for multiple destination chains
 - `TorqueRewards.sol`: Flow-based rewards distribution (referral and cashback)
 - `TorqueFX.sol`: Margin trading extension utilizing the DEX spot liquidity
 - `currencies/`: Currency-specific contracts

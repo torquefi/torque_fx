@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, Signer } from "ethers";
 
-describe("TorqueBatchMinter", function () {
-  let batchMinter: Contract;
+describe("TorqueBatchHandler", function () {
+  let batchHandler: Contract;
   let mockUSDC: Contract;
   let mockPriceFeed: Contract;
   let torqueUSD: Contract;
@@ -56,17 +56,17 @@ describe("TorqueBatchMinter", function () {
     );
     await torqueUSEngine.waitForDeployment();
 
-    // Deploy TorqueBatchMinter
-    const TorqueBatchMinter = await ethers.getContractFactory("TorqueBatchMinter");
-    batchMinter = await TorqueBatchMinter.deploy(
+    // Deploy TorqueBatchHandler
+    const TorqueBatchHandler = await ethers.getContractFactory("TorqueBatchHandler");
+    batchHandler = await TorqueBatchHandler.deploy(
       "0x1a44076050125825900e736c501f859c50fE728c",
       deployerAddress
     );
-    await batchMinter.waitForDeployment();
+    await batchHandler.waitForDeployment();
 
     // Configure batch minter
-    await batchMinter.addSupportedCurrency(await torqueUSD.getAddress());
-    await batchMinter.setEngineAddress(
+    await batchHandler.addSupportedCurrency(await torqueUSD.getAddress());
+    await batchHandler.setEngineAddress(
       await torqueUSD.getAddress(),
       CHAIN_IDS.ETHEREUM,
       await torqueUSEngine.getAddress()
@@ -78,22 +78,22 @@ describe("TorqueBatchMinter", function () {
 
   describe("Deployment", function () {
     it("Should deploy with correct owner", async function () {
-      expect(await batchMinter.owner()).to.equal(deployerAddress);
+      expect(await batchHandler.owner()).to.equal(deployerAddress);
     });
 
     it("Should have correct LayerZero endpoint", async function () {
-      expect(await batchMinter.endpoint()).to.equal("0x1a44076050125825900e736c501f859c50fE728c");
+      expect(await batchHandler.endpoint()).to.equal("0x1a44076050125825900e736c501f859c50fE728c");
     });
 
     it("Should have correct max batch size", async function () {
-      expect(await batchMinter.maxBatchSize()).to.equal(50);
+      expect(await batchHandler.maxBatchSize()).to.equal(50);
     });
   });
 
   describe("Configuration", function () {
     it("Should add supported currency", async function () {
       const currencyAddress = await torqueUSD.getAddress();
-      expect(await batchMinter.supportedCurrencies(currencyAddress)).to.be.true;
+      expect(await batchHandler.supportedCurrencies(currencyAddress)).to.be.true;
     });
 
     it("Should set engine address", async function () {
@@ -101,15 +101,15 @@ describe("TorqueBatchMinter", function () {
       const engineAddress = await torqueUSEngine.getAddress();
       const chainId = CHAIN_IDS.ETHEREUM;
 
-      expect(await batchMinter.engineAddresses(currencyAddress, chainId)).to.equal(engineAddress);
+      expect(await batchHandler.engineAddresses(currencyAddress, chainId)).to.equal(engineAddress);
     });
 
     it("Should only allow owner to add supported currency", async function () {
       const newCurrency = ethers.Wallet.createRandom().address;
       
       await expect(
-        batchMinter.connect(user).addSupportedCurrency(newCurrency)
-      ).to.be.revertedWithCustomError(batchMinter, "OwnableUnauthorizedAccount");
+        batchHandler.connect(user).addSupportedCurrency(newCurrency)
+      ).to.be.revertedWithCustomError(batchHandler, "OwnableUnauthorizedAccount");
     });
 
     it("Should only allow owner to set engine address", async function () {
@@ -118,15 +118,15 @@ describe("TorqueBatchMinter", function () {
       const chainId = CHAIN_IDS.ARBITRUM;
 
       await expect(
-        batchMinter.connect(user).setEngineAddress(currencyAddress, chainId, engineAddress)
-      ).to.be.revertedWithCustomError(batchMinter, "OwnableUnauthorizedAccount");
+        batchHandler.connect(user).setEngineAddress(currencyAddress, chainId, engineAddress)
+      ).to.be.revertedWithCustomError(batchHandler, "OwnableUnauthorizedAccount");
     });
   });
 
   describe("Batch Minting", function () {
     beforeEach(async function () {
       // Approve USDC spending
-      await mockUSDC.connect(user).approve(await batchMinter.getAddress(), ethers.parseUnits("10000", 6));
+      await mockUSDC.connect(user).approve(await batchHandler.getAddress(), ethers.parseUnits("10000", 6));
     });
 
     it("Should revert with invalid batch size", async function () {
@@ -136,14 +136,14 @@ describe("TorqueBatchMinter", function () {
       const adapterParams: string[] = [];
 
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           currencyAddress,
           ethers.parseUnits("1000", 6),
           dstChainIds,
           amountsPerChain,
           adapterParams
         )
-      ).to.be.revertedWithCustomError(batchMinter, "TorqueBatchMinter__InvalidBatchSize");
+      ).to.be.revertedWithCustomError(batchHandler, "TorqueBatchHandler__InvalidBatchSize");
     });
 
     it("Should revert with unsupported currency", async function () {
@@ -153,14 +153,14 @@ describe("TorqueBatchMinter", function () {
       const adapterParams = ["0x"];
 
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           unsupportedCurrency,
           ethers.parseUnits("1000", 6),
           dstChainIds,
           amountsPerChain,
           adapterParams
         )
-      ).to.be.revertedWithCustomError(batchMinter, "TorqueBatchMinter__UnsupportedCurrency");
+      ).to.be.revertedWithCustomError(batchHandler, "TorqueBatchHandler__UnsupportedCurrency");
     });
 
     it("Should revert with invalid chain ID", async function () {
@@ -170,14 +170,14 @@ describe("TorqueBatchMinter", function () {
       const adapterParams = ["0x"];
 
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           currencyAddress,
           ethers.parseUnits("1000", 6),
           dstChainIds,
           amountsPerChain,
           adapterParams
         )
-      ).to.be.revertedWithCustomError(batchMinter, "TorqueBatchMinter__InvalidChainId");
+      ).to.be.revertedWithCustomError(batchHandler, "TorqueBatchHandler__InvalidChainId");
     });
 
     it("Should revert with mismatched array lengths", async function () {
@@ -187,14 +187,14 @@ describe("TorqueBatchMinter", function () {
       const adapterParams = ["0x", "0x"]; // Two adapter params
 
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           currencyAddress,
           ethers.parseUnits("1000", 6),
           dstChainIds,
           amountsPerChain,
           adapterParams
         )
-      ).to.be.revertedWithCustomError(batchMinter, "TorqueBatchMinter__InvalidAmounts");
+      ).to.be.revertedWithCustomError(batchHandler, "TorqueBatchHandler__InvalidAmounts");
     });
 
     it("Should revert with zero total amount", async function () {
@@ -204,14 +204,14 @@ describe("TorqueBatchMinter", function () {
       const adapterParams = ["0x"];
 
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           currencyAddress,
           ethers.parseUnits("1000", 6),
           dstChainIds,
           amountsPerChain,
           adapterParams
         )
-      ).to.be.revertedWithCustomError(batchMinter, "TorqueBatchMinter__InvalidAmounts");
+      ).to.be.revertedWithCustomError(batchHandler, "TorqueBatchHandler__InvalidAmounts");
     });
 
     it("Should emit BatchMintInitiated event", async function () {
@@ -222,18 +222,18 @@ describe("TorqueBatchMinter", function () {
       const totalCollateral = ethers.parseUnits("1000", 6);
 
       // Set up engine addresses for destination chains
-      await batchMinter.setEngineAddress(currencyAddress, CHAIN_IDS.ARBITRUM, await torqueUSEngine.getAddress());
-      await batchMinter.setEngineAddress(currencyAddress, CHAIN_IDS.OPTIMISM, await torqueUSEngine.getAddress());
+      await batchHandler.setEngineAddress(currencyAddress, CHAIN_IDS.ARBITRUM, await torqueUSEngine.getAddress());
+      await batchHandler.setEngineAddress(currencyAddress, CHAIN_IDS.OPTIMISM, await torqueUSEngine.getAddress());
 
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           currencyAddress,
           totalCollateral,
           dstChainIds,
           amountsPerChain,
           adapterParams
         )
-      ).to.emit(batchMinter, "BatchMintInitiated")
+      ).to.emit(batchHandler, "BatchMintInitiated")
         .withArgs(userAddress, currencyAddress, ethers.parseUnits("800", 6), dstChainIds, amountsPerChain);
     });
   });
@@ -251,13 +251,13 @@ describe("TorqueBatchMinter", function () {
 
       // Mock the LayerZero receive function
       await expect(
-        batchMinter._nonblockingLzReceive(
+        batchHandler._nonblockingLzReceive(
           CHAIN_IDS.ARBITRUM,
           ethers.toUtf8Bytes("0x1234"),
           1,
           payload
         )
-      ).to.emit(batchMinter, "BatchMintCompleted")
+      ).to.emit(batchHandler, "BatchMintCompleted")
         .withArgs(userAddress, currencyAddress, CHAIN_IDS.ARBITRUM, amount);
     });
 
@@ -266,7 +266,7 @@ describe("TorqueBatchMinter", function () {
       const amount = ethers.parseUnits("100", 6);
       
       // Remove engine address to simulate failure
-      await batchMinter.setEngineAddress(currencyAddress, CHAIN_IDS.ARBITRUM, ethers.ZeroAddress);
+      await batchHandler.setEngineAddress(currencyAddress, CHAIN_IDS.ARBITRUM, ethers.ZeroAddress);
       
       const payload = ethers.AbiCoder.defaultAbiCoder().encode(
         ["address", "address", "uint256"],
@@ -274,13 +274,13 @@ describe("TorqueBatchMinter", function () {
       );
 
       await expect(
-        batchMinter._nonblockingLzReceive(
+        batchHandler._nonblockingLzReceive(
           CHAIN_IDS.ARBITRUM,
           ethers.toUtf8Bytes("0x1234"),
           1,
           payload
         )
-      ).to.emit(batchMinter, "BatchMintFailed")
+      ).to.emit(batchHandler, "BatchMintFailed")
         .withArgs(userAddress, currencyAddress, CHAIN_IDS.ARBITRUM, amount, "Engine not configured");
     });
   });
@@ -290,7 +290,7 @@ describe("TorqueBatchMinter", function () {
       const dstChainIds = [CHAIN_IDS.ARBITRUM, CHAIN_IDS.OPTIMISM];
       const adapterParams = ["0x", "0x"];
 
-      const gasEstimate = await batchMinter.getBatchMintQuote(dstChainIds, adapterParams);
+      const gasEstimate = await batchHandler.getBatchMintQuote(dstChainIds, adapterParams);
       
       // Should return a reasonable gas estimate
       expect(gasEstimate).to.be.gt(0);
@@ -301,25 +301,25 @@ describe("TorqueBatchMinter", function () {
   describe("Admin Functions", function () {
     it("Should allow owner to set max batch size", async function () {
       const newMaxBatchSize = 5;
-      await batchMinter.setMaxBatchSize(newMaxBatchSize);
-      expect(await batchMinter.maxBatchSize()).to.equal(newMaxBatchSize);
+      await batchHandler.setMaxBatchSize(newMaxBatchSize);
+      expect(await batchHandler.maxBatchSize()).to.equal(newMaxBatchSize);
     });
 
     it("Should only allow owner to set max batch size", async function () {
       await expect(
-        batchMinter.connect(user).setMaxBatchSize(5)
-      ).to.be.revertedWithCustomError(batchMinter, "OwnableUnauthorizedAccount");
+        batchHandler.connect(user).setMaxBatchSize(5)
+      ).to.be.revertedWithCustomError(batchHandler, "OwnableUnauthorizedAccount");
     });
 
     it("Should revert setting invalid max batch size", async function () {
-      await expect(batchMinter.setMaxBatchSize(0)).to.be.revertedWith("Invalid batch size");
-      await expect(batchMinter.setMaxBatchSize(101)).to.be.revertedWith("Invalid batch size");
+      await expect(batchHandler.setMaxBatchSize(0)).to.be.revertedWith("Invalid batch size");
+      await expect(batchHandler.setMaxBatchSize(101)).to.be.revertedWith("Invalid batch size");
     });
 
     it("Should allow owner to remove supported currency", async function () {
       const currencyAddress = await torqueUSD.getAddress();
-      await batchMinter.removeSupportedCurrency(currencyAddress);
-      expect(await batchMinter.supportedCurrencies(currencyAddress)).to.be.false;
+      await batchHandler.removeSupportedCurrency(currencyAddress);
+      expect(await batchHandler.supportedCurrencies(currencyAddress)).to.be.false;
     });
 
     it("Should allow emergency withdrawal", async function () {
@@ -327,10 +327,10 @@ describe("TorqueBatchMinter", function () {
       const amount = ethers.parseUnits("100", 6);
       
       // Transfer some tokens to batch minter
-      await mockUSDC.transfer(await batchMinter.getAddress(), amount);
+      await mockUSDC.transfer(await batchHandler.getAddress(), amount);
       
       const initialBalance = await mockUSDC.balanceOf(deployerAddress);
-      await batchMinter.emergencyWithdraw(tokenAddress, deployerAddress, amount);
+      await batchHandler.emergencyWithdraw(tokenAddress, deployerAddress, amount);
       const finalBalance = await mockUSDC.balanceOf(deployerAddress);
       
       expect(finalBalance - initialBalance).to.equal(amount);
@@ -339,7 +339,7 @@ describe("TorqueBatchMinter", function () {
 
   describe("Supported Chain IDs", function () {
     it("Should return all supported chain IDs", async function () {
-      const supportedChainIds = await batchMinter.getSupportedChainIds();
+      const supportedChainIds = await batchHandler.getSupportedChainIds();
       
       expect(supportedChainIds).to.have.length(8);
       expect(supportedChainIds).to.include(CHAIN_IDS.ETHEREUM);
@@ -353,9 +353,9 @@ describe("TorqueBatchMinter", function () {
     });
 
     it("Should validate supported chain IDs", async function () {
-      expect(await batchMinter.supportedChainIds(CHAIN_IDS.ETHEREUM)).to.be.true;
-      expect(await batchMinter.supportedChainIds(CHAIN_IDS.ARBITRUM)).to.be.true;
-      expect(await batchMinter.supportedChainIds(99999)).to.be.false;
+      expect(await batchHandler.supportedChainIds(CHAIN_IDS.ETHEREUM)).to.be.true;
+      expect(await batchHandler.supportedChainIds(CHAIN_IDS.ARBITRUM)).to.be.true;
+      expect(await batchHandler.supportedChainIds(99999)).to.be.false;
     });
   });
 
@@ -368,13 +368,13 @@ describe("TorqueBatchMinter", function () {
       const adapterParams = ["0x"];
 
       // Set up engine address
-      await batchMinter.setEngineAddress(currencyAddress, CHAIN_IDS.ARBITRUM, await torqueUSEngine.getAddress());
+      await batchHandler.setEngineAddress(currencyAddress, CHAIN_IDS.ARBITRUM, await torqueUSEngine.getAddress());
 
       // Approve USDC
-      await mockUSDC.connect(user).approve(await batchMinter.getAddress(), ethers.parseUnits("10000", 6));
+      await mockUSDC.connect(user).approve(await batchHandler.getAddress(), ethers.parseUnits("10000", 6));
 
       // First call should succeed
-      await batchMinter.connect(user).batchMint(
+      await batchHandler.connect(user).batchMint(
         currencyAddress,
         ethers.parseUnits("1000", 6),
         dstChainIds,
@@ -384,7 +384,7 @@ describe("TorqueBatchMinter", function () {
 
       // Second call should fail due to reentrancy protection
       await expect(
-        batchMinter.connect(user).batchMint(
+        batchHandler.connect(user).batchMint(
           currencyAddress,
           ethers.parseUnits("1000", 6),
           dstChainIds,
