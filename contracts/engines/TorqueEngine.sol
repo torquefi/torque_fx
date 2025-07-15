@@ -21,7 +21,8 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     error TorqueEngine__InvalidInterestRate();
 
     // Constants
-    uint256 internal constant LIQUIDATION_THRESHOLD = 98; // 98% collateral threshold
+    uint256 internal constant LIQUIDATION_THRESHOLD_STABLECOIN = 98; // 98% for stablecoins (USDC, USDT, USDS, PYUSD)
+    uint256 internal constant LIQUIDATION_THRESHOLD_VOLATILE = 80;   // 80% for volatile assets (WETH, WBTC, ETH/BTC derivatives, DeFi tokens)
     uint256 internal constant LIQUIDATION_BONUS = 20; // 20% bonus for liquidators
     uint256 internal constant LIQUIDATION_PRECISION = 100;
     uint256 internal constant MIN_HEALTH_FACTOR = 1e18;
@@ -39,6 +40,8 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     mapping(address => bool) public supportedCollateral;
     mapping(address => address) public collateralPriceFeeds;
     mapping(address => uint8) public collateralDecimals;
+    mapping(address => uint256) public collateralLiquidationThresholds; // Different thresholds per collateral
+    mapping(address => bool) public collateralNeedsEthConversion; // If true, multiply by ETH/USD price
     address[] public supportedCollateralList;
 
     // APR and fee configuration
@@ -90,11 +93,18 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     
     /**
      * @dev Add a new collateral token
+     * @param token The token address
+     * @param decimals Token decimals
+     * @param priceFeed Chainlink price feed address
+     * @param isVolatile false=Stablecoin, true=Volatile (includes DeFi tokens)
+     * @param needsEthConversion true if price feed is token/ETH instead of token/USD
      */
     function addCollateralToken(
         address token,
         uint8 decimals,
-        address priceFeed
+        address priceFeed,
+        bool isVolatile,
+        bool needsEthConversion
     ) external onlyOwner {
         require(token != address(0), "Invalid token");
         require(!supportedCollateral[token], "Token already supported");
@@ -102,6 +112,12 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
         supportedCollateral[token] = true;
         collateralDecimals[token] = decimals;
         collateralPriceFeeds[token] = priceFeed;
+        collateralNeedsEthConversion[token] = needsEthConversion;
+        
+        // Set liquidation threshold based on volatility
+        uint256 threshold = isVolatile ? LIQUIDATION_THRESHOLD_VOLATILE : LIQUIDATION_THRESHOLD_STABLECOIN;
+        collateralLiquidationThresholds[token] = threshold;
+        
         supportedCollateralList.push(token);
         
         emit CollateralTokenAdded(token, decimals, priceFeed);
@@ -155,9 +171,22 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
         (, int256 price,,,) = priceFeed.latestRoundData();
         require(price > 0, "Invalid price feed");
         
-        // Convert to USD value (assuming price feed is in USD with 8 decimals)
+        uint256 usdValue;
         uint8 tokenDecimals = collateralDecimals[token];
-        return (amount * uint256(price)) / (10 ** (8 + tokenDecimals - 6));
+        
+        if (collateralNeedsEthConversion[token]) {
+            // Price feed is token/ETH, need to multiply by ETH/USD price
+            (, int256 ethPrice,,,) = getPriceFeed().latestRoundData();
+            require(ethPrice > 0, "Invalid ETH price feed");
+            
+            // Calculate: (amount * token/ETH price * ETH/USD price) / (10^(8 + tokenDecimals - 6))
+            usdValue = (amount * uint256(price) * uint256(ethPrice)) / (10 ** (16 + tokenDecimals - 6));
+        } else {
+            // Price feed is token/USD directly
+            usdValue = (amount * uint256(price)) / (10 ** (8 + tokenDecimals - 6));
+        }
+        
+        return usdValue;
     }
 
     function depositCollateral(uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant {
@@ -389,9 +418,61 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
         return _calculateHealthFactor(totalTorqueMinted, collateralValueInUsd);
     }
 
-    function _calculateHealthFactor(uint256 totalTorqueMinted, uint256 collateralValueInUsd) internal pure returns (uint256) {
+    /**
+     * @dev Get liquidation threshold for a specific collateral token
+     */
+    function getLiquidationThreshold(address collateralToken) external view returns (uint256) {
+        uint256 threshold = collateralLiquidationThresholds[collateralToken];
+        if (threshold == 0) {
+            // Default to stablecoin threshold if not set
+            threshold = LIQUIDATION_THRESHOLD_STABLECOIN;
+        }
+        return threshold;
+    }
+
+    /**
+     * @dev Calculate health factor for multi-collateral positions
+     */
+    function _calculateMultiCollateralHealthFactor(address user) internal view returns (uint256) {
+        uint256 totalTorqueMinted = s_torqueMinted[user];
         if (totalTorqueMinted == 0) return type(uint256).max;
-        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / 100;
+        
+        uint256 totalCollateralValue = 0;
+        uint256 totalAdjustedCollateralValue = 0;
+        
+        // Calculate weighted average threshold based on collateral composition
+        for (uint256 i = 0; i < supportedCollateralList.length; i++) {
+            address collateralToken = supportedCollateralList[i];
+            uint256 userCollateral = s_collateralDeposited[user]; // This needs to be updated for multi-collateral
+            
+            if (userCollateral > 0) {
+                uint256 collateralValue = getCollateralValue(collateralToken, userCollateral);
+                uint256 threshold = collateralLiquidationThresholds[collateralToken];
+                if (threshold == 0) {
+                    threshold = LIQUIDATION_THRESHOLD_STABLECOIN;
+                }
+                
+                totalCollateralValue += collateralValue;
+                totalAdjustedCollateralValue += (collateralValue * threshold) / 100;
+            }
+        }
+        
+        if (totalCollateralValue == 0) return type(uint256).max;
+        
+        return (totalAdjustedCollateralValue * PRECISION) / totalTorqueMinted;
+    }
+
+    function _calculateHealthFactor(uint256 totalTorqueMinted, uint256 collateralValueInUsd) internal view returns (uint256) {
+        if (totalTorqueMinted == 0) return type(uint256).max;
+        
+        // Use the default collateral token's threshold for backward compatibility
+        address defaultCollateral = address(getCollateralToken());
+        uint256 threshold = collateralLiquidationThresholds[defaultCollateral];
+        if (threshold == 0) {
+            threshold = LIQUIDATION_THRESHOLD_STABLECOIN; // Default to stablecoin threshold
+        }
+        
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * threshold) / 100;
         return (collateralAdjustedForThreshold * PRECISION) / totalTorqueMinted;
     }
 
