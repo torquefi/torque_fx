@@ -131,26 +131,7 @@ const config: HardhatUserConfig = {
         },
       },
     },
-    optimismSepolia: {
-      url: process.env.OPTIMISM_SEPOLIA_RPC_URL || "",
-      accounts: [process.env.PRIVATE_KEY || ""],
-      chainId: 11155420,
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-sepolia-optimistic.etherscan.io",
-        },
-      },
-    },
-    polygonMumbai: {
-      url: process.env.POLYGON_MUMBAI_RPC_URL || "",
-      accounts: [process.env.PRIVATE_KEY || ""],
-      chainId: 80001,
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-testnet.polygonscan.com",
-        },
-      },
-    },
+
     baseGoerli: {
       url: process.env.BASE_GOERLI_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
@@ -169,9 +150,7 @@ const config: HardhatUserConfig = {
       arbitrumOne: process.env.ARBISCAN_API_KEY || "",
       arbitrumSepolia: process.env.ARBITRUM_SEPOLIA_ARBISCAN_API_KEY || process.env.ARBISCAN_API_KEY || "",
       optimisticEthereum: process.env.OPTIMISM_API_KEY || "",
-      optimisticSepolia: process.env.OPTIMISM_SEPOLIA_API_KEY || process.env.OPTIMISM_API_KEY || "",
       polygon: process.env.POLYGONSCAN_API_KEY || "",
-      polygonMumbai: process.env.POLYGON_MUMBAI_POLYGONSCAN_API_KEY || process.env.POLYGONSCAN_API_KEY || "",
       base: process.env.BASESCAN_API_KEY || "",
       baseGoerli: process.env.BASE_GOERLI_BASESCAN_API_KEY || process.env.BASESCAN_API_KEY || "",
       bsc: process.env.BSCSCAN_API_KEY || "",
@@ -198,8 +177,6 @@ export const layerzeroMainnetEndpointIds = {
 export const layerzeroTestnetEndpointIds = {
   sepolia: EndpointId.ETHEREUM_TESTNET,
   arbitrumSepolia: EndpointId.ARBITRUM_TESTNET,
-  optimismSepolia: EndpointId.OPTIMISM_TESTNET,
-  polygonMumbai: EndpointId.POLYGON_TESTNET,
   baseGoerli: EndpointId.BASE_TESTNET,
 };
 
@@ -222,11 +199,7 @@ export const layerzeroMainnetEndpoints = {
 export const layerzeroTestnetEndpoints = {
   sepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
   arbitrumSepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
-  optimismSepolia: "0x6EDCE65403992e310A62460808c4b910D972f10f",
-  polygonMumbai: "0x6EDCE65403992e310A62460808c4b910D972f10f",
   baseGoerli: "0x6EDCE65403992e310A62460808c4b910D972f10f",
-  bscTestnet: "0x6EDCE65403992e310A62460808c4b910D972f10f",
-  avalancheFuji: "0x6EDCE65403992e310A62460808c4b910D972f10f",
 };
 
 export default config;

@@ -58,8 +58,6 @@ const allCollaterals = collateralTokens;
 ### Testnet Networks
 - **Sepolia** (11155111) - Ethereum testnet
 - **Arbitrum Sepolia** (421614) - Arbitrum testnet
-- **Optimism Sepolia** (11155420) - Optimism testnet
-- **Polygon Mumbai** (80001) - Polygon testnet
 - **Base Goerli** (84531) - Base testnet
 
 ## Supported Collaterals

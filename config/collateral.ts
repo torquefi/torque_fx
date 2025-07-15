@@ -15,7 +15,7 @@ export const collateralTokens: CollateralToken[] = [
       arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
       arbitrumSepolia: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
       optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-      optimismSepolia: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7",
+
       polygon: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
       avalanche: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
       base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",

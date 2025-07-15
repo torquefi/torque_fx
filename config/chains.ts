@@ -306,52 +306,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     },
     testnet: true,
   },
-  optimismSepolia: {
-    id: 11155420,
-    name: 'Optimism Sepolia',
-    network: 'optimism-sepolia',
-    nativeCurrency: {
-      name: 'Sepolia Ether',
-      symbol: 'ETH',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://sepolia.optimism.io'],
-    },
-    blockExplorers: {
-      name: 'Optimism Sepolia Etherscan',
-      url: 'https://sepolia-optimistic.etherscan.io',
-      apiUrl: 'https://api-sepolia-optimistic.etherscan.io',
-    },
-    layerZero: {
-      endpointId: EndpointId.OPTIMISM_TESTNET,
-      endpoint: '0x6EDCE65403992e310A62460808c4b910D972f10f',
-    },
-    testnet: true,
-  },
-  polygonMumbai: {
-    id: 80001,
-    name: 'Polygon Mumbai',
-    network: 'polygon-mumbai',
-    nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://rpc-mumbai.maticvigil.com'],
-    },
-    blockExplorers: {
-      name: 'Mumbai PolygonScan',
-      url: 'https://mumbai.polygonscan.com',
-      apiUrl: 'https://api-testnet.polygonscan.com',
-    },
-    layerZero: {
-      endpointId: EndpointId.POLYGON_TESTNET,
-      endpoint: '0x6EDCE65403992e310A62460808c4b910D972f10f',
-    },
-    testnet: true,
-  },
+
   baseGoerli: {
     id: 84531,
     name: 'Base Goerli',
