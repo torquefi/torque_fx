@@ -8,12 +8,9 @@ contract TorqueLP is OFT {
     address public dex;
 
     event DEXUpdated(address indexed oldDex, address indexed newDex);
-
-    // Events for tracking supply changes
     event SupplyMinted(address indexed to, uint256 amount, uint256 newTotalSupply);
     event SupplyBurned(address indexed from, uint256 amount, uint256 newTotalSupply);
     
-    // Internal tracking of total supply
     uint256 private _totalSupply;
 
     constructor(
@@ -44,9 +41,6 @@ contract TorqueLP is OFT {
         emit SupplyBurned(from, amount, _totalSupply);
     }
 
-    /**
-     * @dev Get LP token statistics for frontend
-     */
     function getLPStats() external view returns (
         uint256 supply,
         string memory tokenName,
@@ -57,9 +51,6 @@ contract TorqueLP is OFT {
         tokenSymbol = symbol();
     }
 
-    /**
-     * @dev Get user's LP token information
-     */
     function getUserLPInfo(address user) external view returns (
         uint256 balance,
         uint256 supply,
@@ -69,39 +60,13 @@ contract TorqueLP is OFT {
         supply = _totalSupply;
         
         if (supply > 0) {
-            userShare = (balance * 10000) / supply; // In basis points
+            userShare = (balance * 10000) / supply;
         } else {
             userShare = 0;
         }
     }
 
-    /**
-     * @dev Override totalSupply to use our tracked value
-     */
     function totalSupply() public view override returns (uint256) {
         return _totalSupply;
-    }
-
-    /**
-     * @dev Get total supply from events (for historical tracking)
-     * This function can be used to verify our tracked supply against events
-     */
-    function getTotalSupplyFromEvents() external view returns (uint256) {
-        // This would require querying events from the blockchain
-        // For now, return our tracked value
-        return _totalSupply;
-    }
-
-    /**
-     * @dev Get cross-chain supply information
-     */
-    function getCrossChainSupplyInfo() external view returns (
-        uint256 localSupply,
-        uint256 crossChainTotalSupply,
-        bool isCrossChainEnabled
-    ) {
-        localSupply = _totalSupply;
-        crossChainTotalSupply = _totalSupply; // For now, same as local. Could be enhanced for cross-chain tracking
-        isCrossChainEnabled = true; // OFT enables cross-chain functionality
     }
 }
