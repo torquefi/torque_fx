@@ -53,7 +53,7 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
     uint16 public constant SONIC_CHAIN_ID = 146;
     uint16 public constant ABSTRACT_CHAIN_ID = 2741;
     uint16 public constant BSC_CHAIN_ID = 56;
-    uint16 public constant HYPEREVM_CHAIN_ID = 999;
+
     uint16 public constant FRAXTAL_CHAIN_ID = 252;
     uint16 public constant AVALANCHE_CHAIN_ID = 43114;
     
@@ -79,7 +79,7 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
         supportedChainIds[SONIC_CHAIN_ID] = true;
         supportedChainIds[ABSTRACT_CHAIN_ID] = true;
         supportedChainIds[BSC_CHAIN_ID] = true;
-        supportedChainIds[HYPEREVM_CHAIN_ID] = true;
+
         supportedChainIds[FRAXTAL_CHAIN_ID] = true;
         supportedChainIds[AVALANCHE_CHAIN_ID] = true;
     }
@@ -326,7 +326,7 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
      * @dev Get all supported chain IDs
      */
     function getSupportedChainIds() external view returns (uint16[] memory) {
-        uint16[] memory chainIds = new uint16[](13);
+        uint16[] memory chainIds = new uint16[](12);
         chainIds[0] = ETHEREUM_CHAIN_ID;
         chainIds[1] = ARBITRUM_CHAIN_ID;
         chainIds[2] = OPTIMISM_CHAIN_ID;
@@ -335,7 +335,7 @@ contract TorqueBatchMinter is Ownable, ReentrancyGuard, OApp {
         chainIds[5] = SONIC_CHAIN_ID;
         chainIds[6] = ABSTRACT_CHAIN_ID;
         chainIds[7] = BSC_CHAIN_ID;
-        chainIds[8] = HYPEREVM_CHAIN_ID;
+
         chainIds[9] = FRAXTAL_CHAIN_ID;
         chainIds[10] = AVALANCHE_CHAIN_ID;
         return chainIds;

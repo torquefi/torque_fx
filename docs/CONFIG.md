@@ -52,7 +52,7 @@ const allCollaterals = collateralTokens;
 - **Avalanche** (43114) - Avalanche C-Chain
 - **Sonic** (146) - Sonic
 - **Abstract** (2741) - Abstract
-- **HyperEVM** (999) - HyperEVM
+
 - **Fraxtal** (252) - Fraxtal
 
 ### Testnet Networks

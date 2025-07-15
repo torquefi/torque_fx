@@ -234,29 +234,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     },
     testnet: false,
   },
-  hyperevm: {
-    id: 999,
-    name: 'HyperEVM',
-    network: 'hyperevm',
-    nativeCurrency: {
-      name: 'Hyper',
-      symbol: 'HYPER',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://rpc.hyperevm.com'],
-    },
-    blockExplorers: {
-      name: 'HyperEVM Explorer',
-      url: 'https://explorer.hyperevm.com',
-      apiUrl: 'https://explorer.hyperevm.com/api',
-    },
-    layerZero: {
-      endpointId: EndpointId.ETHEREUM_MAINNET, // Using Ethereum endpoint as fallback
-      endpoint: '0x3A73033C0b1407574C76BdBAc67f126f6b4a9AA9',
-    },
-    testnet: false,
-  },
+
   fraxtal: {
     id: 252,
     name: 'Fraxtal',

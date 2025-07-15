@@ -59,7 +59,7 @@ const routerAddress = getContractAddress('ethereum', 'torqueRouter');
 
 ### Supported Networks
 
-- **Mainnet**: Ethereum, Arbitrum, Optimism, Polygon, Base, BSC, Avalanche, Sonic, Abstract, HyperEVM, Fraxtal
+- **Mainnet**: Ethereum, Arbitrum, Optimism, Polygon, Base, BSC, Avalanche, Sonic, Abstract, Fraxtal
 - **Testnet**: Sepolia, Arbitrum Sepolia, Optimism Sepolia, Polygon Mumbai, Base Goerli
 
 ### Supported Collaterals

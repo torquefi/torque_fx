@@ -22,7 +22,7 @@ describe("TorqueBatchMinter", function () {
     SONIC: 146,
     ABSTRACT: 2741,
     BSC: 56,
-    HYPEREVM: 999,
+
     FRAXTAL: 252,
     AVALANCHE: 43114,
   };

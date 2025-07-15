@@ -94,11 +94,7 @@ const config: HardhatUserConfig = {
         },
       },
     },
-    hyperevm: {
-      url: process.env.HYPEREVM_RPC_URL || "",
-      accounts: [process.env.PRIVATE_KEY || ""],
-      chainId: 999,
-    },
+
     fraxtal: {
       url: process.env.FRAXTAL_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY || ""],
@@ -217,7 +213,7 @@ export const layerzeroMainnetEndpoints = {
   bsc: "0x1a44076050125825900e736c501f859c50fE728c",
   sonic: "0x6F475642a6e85809B1c36Fa62763669b1b48DD5B",
   abstract: "0x5c6cfF4b7C49805F8295Ff73C204ac83f3bC4AE7",
-  hyperevm: "0x3A73033C0b1407574C76BdBAc67f126f6b4a9AA9",
+
   fraxtal: "0x1a44076050125825900e736c501f859c50fE728c",
   avalanche: "0x1a44076050125825900e736c501f859c50fE728c",
 };
