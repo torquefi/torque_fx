@@ -40,11 +40,11 @@ contract TorqueStake is OApp, ReentrancyGuard {
     uint256 public constant MIN_EARLY_EXIT_PENALTY = 2500; // 25% in basis points
     uint256 public constant VOTE_POWER_MULTIPLIER = 5e18; // 5x vote power for max lock
 
-    // Dynamic APR parameters (in basis points)
-    uint256 public constant BASE_APR_TORQ = 5000; // 50% base APR for TORQ
-    uint256 public constant BASE_APR_LP = 3000; // 30% base APR for LP
-    uint256 public constant MAX_APR_TORQ = 80000; // 800% max APR for TORQ
-    uint256 public constant MAX_APR_LP = 60000; // 600% max APR for LP
+    // Dynamic APR parameters (in basis points) - UPDATED: More sustainable values
+    uint256 public constant BASE_APR_TORQ = 1000; // 10% base APR for TORQ (reduced from 50%)
+    uint256 public constant BASE_APR_LP = 800; // 8% base APR for LP (reduced from 30%)
+    uint256 public constant MAX_APR_TORQ = 20000; // 200% max APR for TORQ (reduced from 800%)
+    uint256 public constant MAX_APR_LP = 15000; // 150% max APR for LP (reduced from 600%)
     uint256 public constant APR_PRECISION = 10000; // For basis points
     
     // TVL scaling parameters

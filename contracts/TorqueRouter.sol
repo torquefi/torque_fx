@@ -16,8 +16,6 @@ contract TorqueRouter is Ownable {
     mapping(address => bool) public allowedTokens;
     mapping(address => bool) public allowedPriceFeeds;
 
-
-
     event PairAdded(bytes32 indexed pairId, address token0, address token1, address priceFeed);
     event PairRemoved(bytes32 indexed pairId);
     event TokenAllowed(address indexed token, bool allowed);
