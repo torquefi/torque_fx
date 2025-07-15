@@ -160,9 +160,7 @@ contract TorqueStake is OApp, ReentrancyGuard {
         supportedChainIds[137] = true;    // Polygon
         supportedChainIds[8453] = true;   // Base
         supportedChainIds[146] = true;    // Sonic
-        supportedChainIds[2741] = true;   // Abstract
         supportedChainIds[56] = true;     // BSC
-        supportedChainIds[252] = true;    // Fraxtal
         supportedChainIds[43114] = true;  // Avalanche
     }
 

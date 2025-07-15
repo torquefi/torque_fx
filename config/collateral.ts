@@ -21,8 +21,6 @@ export const collateralTokens: CollateralToken[] = [
       base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       baseSepolia: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
       sonic: "0x29219dd400f2Bf60E5a23d13Be72B486D4038894",
-      abstract: "0x84A71ccD554Cc1b02749b35d22F684CC8ec987e1",
-      abstractTestnet: "0xe4C7fBB0a626ed208021ccabA6Be1566905E2d",
       bsc: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
     },
     priceFeeds: {
@@ -46,7 +44,6 @@ export const collateralTokens: CollateralToken[] = [
       avalanche: "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7",
       base: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
       sonic: "0x6047828dc181963ba44974801FF68e538dA5eaF9",
-      abstract: "0x0709F39376dEEe2A2dfC94A58EdEb2Eb9DF012bD",
       optimism: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58"
     },
     priceFeeds: {
@@ -131,13 +128,10 @@ export const collateralTokens: CollateralToken[] = [
     symbol: "WETH",
     name: "Wrapped Ether",
     contracts: {
-      ethereum: "0x...",
-      abstract: "0x3439153EB7AF838Ad19d56E1571FBD09333C2809",
-      abstractTestnet: "0x9EDCde0257F2386Ce177C3a7FCdd97787F0D84"
+      ethereum: "0x..."
     },
     priceFeeds: {
-      ethereum: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
-      abstract: "0x..."
+      ethereum: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     }
   },
   {

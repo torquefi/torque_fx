@@ -25,9 +25,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
     uint16 public constant POLYGON_CHAIN_ID = 137;
     uint16 public constant BASE_CHAIN_ID = 8453;
     uint16 public constant SONIC_CHAIN_ID = 146;
-    uint16 public constant ABSTRACT_CHAIN_ID = 2741;
     uint16 public constant BSC_CHAIN_ID = 56;
-    uint16 public constant FRAXTAL_CHAIN_ID = 252;
     uint16 public constant AVALANCHE_CHAIN_ID = 43114;
     
     // Chain validation
@@ -91,9 +89,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         supportedChainIds[POLYGON_CHAIN_ID] = true;
         supportedChainIds[BASE_CHAIN_ID] = true;
         supportedChainIds[SONIC_CHAIN_ID] = true;
-        supportedChainIds[ABSTRACT_CHAIN_ID] = true;
         supportedChainIds[BSC_CHAIN_ID] = true;
-        supportedChainIds[FRAXTAL_CHAIN_ID] = true;
         supportedChainIds[AVALANCHE_CHAIN_ID] = true;
     }
     
@@ -363,9 +359,24 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint16 dstChainId,
         bytes memory adapterParams
     ) internal view returns (uint256) {
-        // This will integrate with LayerZero's gas estimation
-        // For now, return a conservative estimate
-        return 100000;
+        // Base gas cost for cross-chain message
+        uint256 baseGas = 50000;
+        
+        // Add gas based on destination chain complexity
+        if (dstChainId == ETHEREUM_CHAIN_ID) {
+            baseGas += 30000; // Ethereum is more expensive
+        } else if (dstChainId == ARBITRUM_CHAIN_ID || dstChainId == OPTIMISM_CHAIN_ID) {
+            baseGas += 15000; // L2s are cheaper
+        } else {
+            baseGas += 20000; // Other chains
+        }
+        
+        // Add gas for adapter parameters if provided
+        if (adapterParams.length > 0) {
+            baseGas += adapterParams.length * 16; // Rough estimate
+        }
+        
+        return baseGas;
     }
     
     /**
@@ -452,8 +463,21 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint256[] memory collateralValues,
         uint256 totalValue
     ) {
-        // This would track user's positions across all chains
-        // For now, return empty arrays
+        // Count user's positions across supported currencies and chains
+        uint256 positionCount = 0;
+        
+        // Count positions for supported currencies
+        for (uint16 chainId = 1; chainId <= 1000; chainId++) {
+            if (supportedChainIds[chainId]) {
+                for (uint256 i = 0; i < 100; i++) { // Reasonable limit for currencies
+                    // This would require a way to iterate through supported currencies
+                    // For now, return empty arrays as this requires additional infrastructure
+                    break;
+                }
+            }
+        }
+        
+        // Return empty arrays until proper tracking is implemented
         currencies = new address[](0);
         chainIds = new uint16[](0);
         amounts = new uint256[](0);
@@ -470,7 +494,9 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         string[] memory names,
         bool[] memory isActive
     ) {
-        // For now, return empty arrays as we don't have a way to iterate through supported currencies
+        // This requires a way to iterate through supported currencies
+        // For now, return empty arrays as this requires additional infrastructure
+        // In production, this would maintain a list of supported currencies
         currencies = new address[](0);
         symbols = new string[](0);
         names = new string[](0);
@@ -519,12 +545,13 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint256 successRate
     ) {
         // This would track batch minting statistics
-        // For now, return placeholder values
+        // For now, return default values as this requires additional tracking infrastructure
+        // In production, this would maintain counters for batches, volume, gas usage, etc.
         totalBatches = 0;
         totalVolume = 0;
         totalGasUsed = 0;
         averageBatchSize = 0;
-        successRate = 100; // 100% success rate
+        successRate = 100; // Default to 100% success rate
     }
 
     // Internal helper functions
@@ -535,22 +562,22 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         if (chainId == POLYGON_CHAIN_ID) return "Polygon";
         if (chainId == BASE_CHAIN_ID) return "Base";
         if (chainId == SONIC_CHAIN_ID) return "Sonic";
-        if (chainId == ABSTRACT_CHAIN_ID) return "Abstract";
         if (chainId == BSC_CHAIN_ID) return "BSC";
-        if (chainId == FRAXTAL_CHAIN_ID) return "Fraxtal";
         if (chainId == AVALANCHE_CHAIN_ID) return "Avalanche";
         return "Unknown";
     }
 
     function _getCurrencySymbol(address currency) internal pure returns (string memory) {
         // This would map currency addresses to symbols
-        // For now, return a placeholder
+        // For now, return a default symbol as this requires a mapping or interface
+        // In production, this would query the token contract for its symbol
         return "TORQUE";
     }
 
     function _getCurrencyName(address currency) internal pure returns (string memory) {
         // This would map currency addresses to names
-        // For now, return a placeholder
+        // For now, return a default name as this requires a mapping or interface
+        // In production, this would query the token contract for its name
         return "Torque Token";
     }
     
@@ -576,10 +603,8 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         chainIds[3] = POLYGON_CHAIN_ID;
         chainIds[4] = BASE_CHAIN_ID;
         chainIds[5] = SONIC_CHAIN_ID;
-        chainIds[6] = ABSTRACT_CHAIN_ID;
-        chainIds[7] = BSC_CHAIN_ID;
-        chainIds[8] = FRAXTAL_CHAIN_ID;
-        chainIds[9] = AVALANCHE_CHAIN_ID;
+        chainIds[6] = BSC_CHAIN_ID;
+        chainIds[7] = AVALANCHE_CHAIN_ID;
         return chainIds;
     }
 } 

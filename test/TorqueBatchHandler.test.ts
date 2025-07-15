@@ -20,10 +20,7 @@ describe("TorqueBatchHandler", function () {
     POLYGON: 137,
     BASE: 8453,
     SONIC: 146,
-    ABSTRACT: 2741,
     BSC: 56,
-
-    FRAXTAL: 252,
     AVALANCHE: 43114,
   };
 
@@ -348,8 +345,8 @@ describe("TorqueBatchHandler", function () {
       expect(supportedChainIds).to.include(CHAIN_IDS.POLYGON);
       expect(supportedChainIds).to.include(CHAIN_IDS.BASE);
       expect(supportedChainIds).to.include(CHAIN_IDS.SONIC);
-      expect(supportedChainIds).to.include(CHAIN_IDS.ABSTRACT);
       expect(supportedChainIds).to.include(CHAIN_IDS.BSC);
+      expect(supportedChainIds).to.include(CHAIN_IDS.AVALANCHE);
     });
 
     it("Should validate supported chain IDs", async function () {

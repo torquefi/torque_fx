@@ -1598,8 +1598,9 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         for (uint16 i = 1; i <= 1000; i++) {
             if (supportedChainIds[i]) {
                 chainIds[index] = i;
-                // Note: This would require cross-chain queries in a real implementation
-                // For now, return 0 as placeholder
+                // This would require cross-chain queries in a real implementation
+                // For now, return 0 as this requires additional cross-chain infrastructure
+                // In production, this would query liquidity on each supported chain
                 amounts[index] = 0;
                 totalAmount += amounts[index];
                 index++;

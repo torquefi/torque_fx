@@ -167,7 +167,7 @@ export const CHAINS: Record<string, ChainConfig> = {
   },
   avalanche: {
     id: 43114,
-    name: 'Avalanche C-Chain',
+    name: 'Avalanche',
     network: 'avalanche',
     nativeCurrency: {
       name: 'Avalanche',
@@ -175,12 +175,12 @@ export const CHAINS: Record<string, ChainConfig> = {
       decimals: 18,
     },
     rpcUrls: {
-      http: ['https://api.avax.network/ext/bc/C/rpc', 'https://avalanche.llamarpc.com'],
+      http: ['https://api.avax.network/ext/bc/C/rpc'],
     },
     blockExplorers: {
-      name: 'Snowtrace',
+      name: 'Avalanche Explorer',
       url: 'https://snowtrace.io',
-      apiUrl: 'https://api.snowtrace.io',
+      apiUrl: 'https://api.snowtrace.io/api',
     },
     layerZero: {
       endpointId: EndpointId.AVALANCHE_MAINNET,
@@ -210,125 +210,6 @@ export const CHAINS: Record<string, ChainConfig> = {
       endpoint: '0x6F475642a6e85809B1c36Fa62763669b1b48DD5B',
     },
     testnet: false,
-  },
-  abstract: {
-    id: 2741,
-    name: 'Abstract',
-    network: 'abstract',
-    nativeCurrency: {
-      name: 'Abstract',
-      symbol: 'ABS',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://rpc.abstract.money'],
-    },
-    blockExplorers: {
-      name: 'Abstract Explorer',
-      url: 'https://explorer.abstract.money',
-      apiUrl: 'https://explorer.abstract.money/api',
-    },
-    layerZero: {
-      endpointId: EndpointId.ABSTRACT_MAINNET,
-      endpoint: '0x5c6cfF4b7C49805F8295Ff73C204ac83f3bC4AE7',
-    },
-    testnet: false,
-  },
-
-  fraxtal: {
-    id: 252,
-    name: 'Fraxtal',
-    network: 'fraxtal',
-    nativeCurrency: {
-      name: 'Ether',
-      symbol: 'ETH',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://rpc.fraxtal.com'],
-    },
-    blockExplorers: {
-      name: 'Fraxtal Explorer',
-      url: 'https://explorer.fraxtal.com',
-      apiUrl: 'https://explorer.fraxtal.com/api',
-    },
-    layerZero: {
-      endpointId: EndpointId.FRAXTAL_MAINNET,
-      endpoint: '0x1a44076050125825900e736c501f859c50fE728c',
-    },
-    testnet: false,
-  },
-
-  // Testnet chains
-  sepolia: {
-    id: 11155111,
-    name: 'Sepolia',
-    network: 'sepolia',
-    nativeCurrency: {
-      name: 'Sepolia Ether',
-      symbol: 'ETH',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://rpc.sepolia.org', 'https://sepolia.llamarpc.com'],
-    },
-    blockExplorers: {
-      name: 'Sepolia Etherscan',
-      url: 'https://sepolia.etherscan.io',
-      apiUrl: 'https://api-sepolia.etherscan.io',
-    },
-    layerZero: {
-      endpointId: EndpointId.ETHEREUM_TESTNET,
-      endpoint: '0x6EDCE65403992e310A62460808c4b910D972f10f',
-    },
-    testnet: true,
-  },
-  arbitrumSepolia: {
-    id: 421614,
-    name: 'Arbitrum Sepolia',
-    network: 'arbitrum-sepolia',
-    nativeCurrency: {
-      name: 'Sepolia Ether',
-      symbol: 'ETH',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://sepolia-rollup.arbitrum.io/rpc'],
-    },
-    blockExplorers: {
-      name: 'Arbitrum Sepolia Arbiscan',
-      url: 'https://sepolia.arbiscan.io',
-      apiUrl: 'https://api-sepolia.arbiscan.io',
-    },
-    layerZero: {
-      endpointId: EndpointId.ARBITRUM_TESTNET,
-      endpoint: '0x6EDCE65403992e310A62460808c4b910D972f10f',
-    },
-    testnet: true,
-  },
-
-  baseSepolia: {
-    id: 84532,
-    name: 'Base Sepolia',
-    network: 'base-sepolia',
-    nativeCurrency: {
-      name: 'Sepolia Ether',
-      symbol: 'ETH',
-      decimals: 18,
-    },
-    rpcUrls: {
-      http: ['https://sepolia.base.org'],
-    },
-    blockExplorers: {
-      name: 'Base Sepolia BaseScan',
-      url: 'https://sepolia.basescan.org',
-      apiUrl: 'https://api-sepolia.basescan.org',
-    },
-    layerZero: {
-      endpointId: EndpointId.BASE_TESTNET,
-      endpoint: '0x6EDCE65403992e310A62460808c4b910D972f10f',
-    },
-    testnet: true,
   },
 };
 

@@ -633,18 +633,23 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     }
 
     function _getVolume24h() internal view returns (uint256) {
-        // This would need volume tracking
-        // For now, return 0
+        // This would need volume tracking from events or external data
+        // For now, return 0 as this requires additional infrastructure
+        // In production, this would track Transfer events over the last 24 hours
         return 0;
     }
 
     function _getVolume7d() internal view returns (uint256) {
-        // This would need volume tracking
+        // This would need volume tracking from events or external data
+        // For now, return 0 as this requires additional infrastructure
+        // In production, this would track Transfer events over the last 7 days
         return 0;
     }
 
     function _getVolume30d() internal view returns (uint256) {
-        // This would need volume tracking
+        // This would need volume tracking from events or external data
+        // For now, return 0 as this requires additional infrastructure
+        // In production, this would track Transfer events over the last 30 days
         return 0;
     }
 
@@ -655,7 +660,9 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
 
     function _getLiquidityPercent() internal view returns (uint256) {
         // This would need total market liquidity calculation
-        return 100; // Placeholder
+        // For now, return 100 as this requires additional market data
+        // In production, this would calculate the percentage of total market liquidity
+        return 100; // Default to 100% as placeholder
     }
 
     /**
@@ -797,8 +804,10 @@ abstract contract TorqueEngine is Ownable, ReentrancyGuard, OFTCore {
     }
 
     function _getCurrentRate() internal view returns (uint256) {
-        // This would get the current exchange rate
-        return PRECISION; // 1:1 for now
+        // This would get the current exchange rate from oracle or DEX
+        // For now, return 1:1 as this requires oracle integration
+        // In production, this would query price feeds or DEX pools for current rate
+        return PRECISION; // Default to 1:1 exchange rate
     }
 
     function _getTotalSupply() internal view returns (uint256) {

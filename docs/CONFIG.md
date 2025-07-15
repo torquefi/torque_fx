@@ -51,9 +51,6 @@ const allCollaterals = collateralTokens;
 - **BSC** (56) - Binance Smart Chain
 - **Avalanche** (43114) - Avalanche C-Chain
 - **Sonic** (146) - Sonic
-- **Abstract** (2741) - Abstract
-
-- **Fraxtal** (252) - Fraxtal
 
 ### Testnet Networks
 - **Sepolia** (11155111) - Ethereum testnet
