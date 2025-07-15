@@ -15,7 +15,6 @@ export const collateralTokens: CollateralToken[] = [
       arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
       arbitrumSepolia: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
       optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-
       polygon: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
       avalanche: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
       base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -57,6 +56,34 @@ export const collateralTokens: CollateralToken[] = [
     }
   },
   {
+    symbol: "USD0",
+    name: "Usual USD",
+    contracts: {
+      ethereum: "0x73A15FeD60Bf67631dC6cd7Bc5B6e8da8190aCF5",
+      arbitrum: "0x35f1C5cB7Fb977E669fD244C567Da99d8a3a6850",
+      base: "0x758a3e0b1F842C9306B783f8A4078C6C8C03a270"
+    },
+    priceFeeds: {
+      ethereum: "0x...",
+      arbitrum: "0x...",
+      base: "0x..."
+    }
+  },
+  {
+    symbol: "sUSDS",
+    name: "Savings USDS",
+    contracts: {
+      ethereum: "0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD",
+      arbitrum: "0xdDb46999F8891663a8F2828d25298f70416d7610",
+      base: "0x5875eEE11Cf8398102FdAd704C9E96607675467a"
+    },
+    priceFeeds: {
+      ethereum: "0x...",
+      arbitrum: "0x...",
+      base: "0x..."
+    }
+  },
+  {
     symbol: "USDS",
     name: "Sky USD",
     contracts: {
@@ -81,31 +108,23 @@ export const collateralTokens: CollateralToken[] = [
     }
   },
   {
-    symbol: "WYST",
-    name: "Wyoming Stable",
-    contracts: {
-      wyoming: "0x..."
-    },
-    priceFeeds: {
-      wyoming: "0x..."
-    }
-  },
-  {
     symbol: "GHO",
     name: "Aave GHO",
     contracts: {
-      ethereum: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"
+      ethereum: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+      arbitrum: "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33"
     },
     priceFeeds: {
-      ethereum: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC"
+      ethereum: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+      arbitrum: "0x..."
     }
   },
   {
     symbol: "cbBTC",
     name: "Coinbase Bitcoin",
     contracts: {
-      ethereum: "0x...",
-      base: "0x..."
+      ethereum: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+      base: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
     },
     priceFeeds: {
       ethereum: "0x...",
@@ -116,11 +135,13 @@ export const collateralTokens: CollateralToken[] = [
     symbol: "cbETH",
     name: "Coinbase Ether",
     contracts: {
-      ethereum: "0x...",
-      base: "0x..."
+      ethereum: "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704",
+      arbitrum: "0x1DEBd73E752bEaF79865Fd6446b0c970EaE7732f",
+      base: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22"
     },
     priceFeeds: {
       ethereum: "0x...",
+      arbitrum: "0x...",
       base: "0x..."
     }
   },
@@ -128,45 +149,55 @@ export const collateralTokens: CollateralToken[] = [
     symbol: "WETH",
     name: "Wrapped Ether",
     contracts: {
-      ethereum: "0x..."
+      ethereum: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      arbitrum: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+      base: "0x4200000000000000000000000000000000000006",
+      optimism: "0x4200000000000000000000000000000000000006",
+      avalanche: "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB",
+      polygon: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+      bsc: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+      sonic: "0x29219dd400f2Bf60E5a23d13Be72B486D4038894"
     },
     priceFeeds: {
-      ethereum: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+      ethereum: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+      arbitrum: "0x...",
+      base: "0x...",
+      optimism: "0x...",
+      avalanche: "0x...",
+      polygon: "0x...",
+      bsc: "0x...",
+      sonic: "0x..."
     }
   },
   {
     symbol: "WBTC",
     name: "Wrapped Bitcoin",
     contracts: {
-      ethereum: "0x...",
-      base: "0x..."
+      ethereum: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+      arbitrum: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+      base: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+      optimism: "0x68f180fcCe6836688e9084f035309E29Bf0A2095",
+      avalanche: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+      polygon: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+      bsc: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+      sonic: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c"
     },
     priceFeeds: {
       ethereum: "0x...",
-      base: "0x..."
+      arbitrum: "0x...",
+      base: "0x...",
+      optimism: "0x...",
+      avalanche: "0x...",
+      polygon: "0x...",
+      bsc: "0x...",
+      sonic: "0x..."
     }
   },
   {
     symbol: "weETH",
     name: "Ether.fi ETH",
     contracts: {
-      ethereum: "0x...",
-      arbitrum: "0x...",
-      bsc: "0x...",
-      base: "0x..."
-    },
-    priceFeeds: {
-      ethereum: "0x...",
-      arbitrum: "0x20bAe7e1De9c596f5F7615aeaa1342Ba99294e12",
-      bsc: "0xF37Be32598E9851f785acA86c2162e7C1A8466dd",
-      base: "0x35e9D7001819Ea3B39Da906aE6b06A62cfe2c181"
-    }
-  },
-  {
-    symbol: "rsETH",
-    name: "Kelp DAO ETH",
-    contracts: {
-      ethereum: "0x..."
+      ethereum: "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee"
     },
     priceFeeds: {
       ethereum: "0x..."
@@ -174,44 +205,38 @@ export const collateralTokens: CollateralToken[] = [
   },
   {
     symbol: "stETH",
-    name: "Lido ETH",
+    name: "Lido stETH",
     contracts: {
-      ethereum: "0x...",
-      arbitrum: "0x..."
+      ethereum: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+    },
+    priceFeeds: {
+      ethereum: "0x..."
+    }
+  },
+  {
+    symbol: "wstETH",
+    name: "Lido Wrapped stETH",
+    contracts: {
+      ethereum: "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+      arbitrum: "0x5979D7b546E38E414F7E9822514be443A4800529",
+      base: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
+      optimism: "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb"
     },
     priceFeeds: {
       ethereum: "0x...",
-      arbitrum: "0x..."
+      arbitrum: "0x...",
+      base: "0x...",
+      optimism: "0x..."
     }
   },
   {
     symbol: "mETH",
     name: "Mantle ETH",
     contracts: {
-      mantle: "0x..."
+      mantle: "0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa"
     },
     priceFeeds: {
-      mantle: "0x..."
-    }
-  },
-  {
-    symbol: "stBTC",
-    name: "Babylon BTC",
-    contracts: {
-      babylon: "0x..."
-    },
-    priceFeeds: {
-      babylon: "0x..."
-    }
-  },
-  {
-    symbol: "vBTC",
-    name: "Corn BTC",
-    contracts: {
-      cornchain: "0x..."
-    },
-    priceFeeds: {
-      cornchain: "0x..."
+      mantle: "0x5b563107C8666d2142C216114228443B94152362"
     }
   },
   {
@@ -242,20 +267,48 @@ export const collateralTokens: CollateralToken[] = [
     symbol: "AAVE",
     name: "Aave",
     contracts: {
-      ethereum: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
+      ethereum: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+      base: "0x63706e401c06ac8513145b7687A14804d17f814b",
+      bsc: "0xfb6115445Bff7b52FeB98650C87f44907E58f802",
+      arbitrum: "0xba5DdD1f9d7F570dc94a51479a000E3BCE967196",
+      polygon: "0xD6DF932A45C0f255f85145f286eA0b292B21C90B"
     },
     priceFeeds: {
-      ethereum: "0xbd7F896e60B650C01caf2d7279a1148189A68884"
+      ethereum: "0xbd7F896e60B650C01caf2d7279a1148189A68884",
+      base: "0x...",
+      bsc: "0x...",
+      arbitrum: "0x...",
+      polygon: "0x..."
+    }
+  },
+  {
+    symbol: "MORPHO",
+    name: "Morpho",
+    contracts: {
+      ethereum: "0x58D97B57BB95320F9a05dC918Aef65434969c2B2",
+      base: "0xBAa5CC21fd487B8Fcc2F632f3F4E8D37262a0842"
+    },
+    priceFeeds: {
+      ethereum: "0x...",
+      base: "0x..."
     }
   },
   {
     symbol: "COMP",
     name: "Compound",
     contracts: {
-      ethereum: "0xc00e94Cb662C3520282E6f5717214004A7f26888"
+      ethereum: "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+      base: "0x9e1028F5F1D5eDE59748FFceE5532509976840E0",
+      bsc: "0x52CE071Bd9b1C4B00A0b92D298c512478CaD67e8",
+      arbitrum: "0x354A6dA3fcde098F8389cad84b0182725c6C91dE",
+      polygon: "0x8505b9d2254A7Ae468c0E9dd10Ccea3A837aef5c"
     },
     priceFeeds: {
-      ethereum: "0xdbd020CAeF83eFd542f4De03e3cF0C28A4428bd5"
+      ethereum: "0xdbd020CAeF83eFd542f4De03e3cF0C28A4428bd5",
+      base: "0x...",
+      bsc: "0x...",
+      arbitrum: "0x...",
+      polygon: "0x..."
     }
   }
 ];
