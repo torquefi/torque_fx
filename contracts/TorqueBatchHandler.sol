@@ -9,7 +9,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 
 /**
  * @title TorqueBatchHandler
- * @dev Allows users to mint, burn, and redeem Torque tokens across multiple destination chains in a single transaction
+ * @dev Allows users to mint and burn Torque currencies across multiple destination chains in a single transaction
  */
 contract TorqueBatchHandler is OApp, ReentrancyGuard {
     
@@ -50,14 +50,6 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint256[] amountsPerChain
     );
     
-    event BatchRedeemInitiated(
-        address indexed user,
-        address indexed currency,
-        uint256 totalAmount,
-        uint16[] dstChainIds,
-        uint256[] amountsPerChain
-    );
-    
     event BatchMintCompleted(
         address indexed user,
         address indexed currency,
@@ -80,12 +72,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint256 amount
     );
     
-    event BatchRedeemCompleted(
-        address indexed user,
-        address indexed currency,
-        uint16 indexed sourceChainId,
-        uint256 amount
-    );
+
     
     // Errors
     error TorqueBatchHandler__InvalidBatchSize();
@@ -111,7 +98,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Mint tokens to multiple destination chains
+     * @dev Mint Torque currencies to multiple destination chains by depositing collateral
      * @param currency The Torque currency to mint (e.g., TorqueEUR address)
      * @param totalCollateralAmount Total collateral to deposit
      * @param dstChainIds Array of destination chain IDs
@@ -182,7 +169,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
     }
 
     /**
-     * @dev Batch burn tokens on multiple destination chains
+     * @dev Batch burn Torque currencies and redeem collateral on multiple destination chains
      */
     function batchBurn(
         address currency,
@@ -215,10 +202,10 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         if (totalBurn == 0) {
             revert TorqueBatchHandler__InvalidAmounts();
         }
-        // Burn tokens from user
+        // Burn Torque currencies from user
         IERC20(currency).transferFrom(msg.sender, address(this), totalBurn);
         IERC20(currency).approve(address(this), totalBurn);
-        // Send burn requests to each destination chain
+        // Send burn requests for Torque currencies to each destination chain
         for (uint256 i = 0; i < dstChainIds.length; i++) {
             if (amountsPerChain[i] > 0) {
                 _sendBurnRequest(
@@ -232,53 +219,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         emit BatchBurnInitiated(msg.sender, currency, totalBurn, dstChainIds, amountsPerChain);
     }
 
-    /**
-     * @dev Batch redeem collateral for burned tokens on multiple destination chains
-     */
-    function batchRedeem(
-        address currency,
-        uint256 totalRedeemAmount,
-        uint16[] calldata dstChainIds,
-        uint256[] calldata amountsPerChain,
-        bytes[] calldata adapterParams
-    ) external nonReentrant {
-        // Validations
-        if (dstChainIds.length == 0 || dstChainIds.length > maxBatchSize) {
-            revert TorqueBatchHandler__InvalidBatchSize();
-        }
-        if (dstChainIds.length != amountsPerChain.length || dstChainIds.length != adapterParams.length) {
-            revert TorqueBatchHandler__InvalidAmounts();
-        }
-        if (!supportedCurrencies[currency]) {
-            revert TorqueBatchHandler__UnsupportedCurrency();
-        }
-        // Validate all destination chains are supported
-        for (uint256 i = 0; i < dstChainIds.length; i++) {
-            if (!supportedChainIds[dstChainIds[i]]) {
-                revert TorqueBatchHandler__InvalidChainId();
-            }
-        }
-        // Calculate total amount to redeem
-        uint256 totalRedeem = 0;
-        for (uint256 i = 0; i < amountsPerChain.length; i++) {
-            totalRedeem += amountsPerChain[i];
-        }
-        if (totalRedeem == 0) {
-            revert TorqueBatchHandler__InvalidAmounts();
-        }
-        // Send redeem requests to each destination chain
-        for (uint256 i = 0; i < dstChainIds.length; i++) {
-            if (amountsPerChain[i] > 0) {
-                _sendRedeemRequest(
-                    currency,
-                    dstChainIds[i],
-                    amountsPerChain[i],
-                    adapterParams[i]
-                );
-            }
-        }
-        emit BatchRedeemInitiated(msg.sender, currency, totalRedeem, dstChainIds, amountsPerChain);
-    }
+
     
     /**
      * @dev Handle incoming mint requests from other chains
@@ -375,7 +316,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint256 amount,
         bytes calldata adapterParams
     ) internal {
-        // This would interact with the engine contract on the destination chain to burn
+        // This would interact with the engine contract on the destination chain to burn Torque currencies
         address engineAddress = engineAddresses[currency][dstChainId];
         if (engineAddress == address(0)) {
             revert TorqueBatchHandler__EngineNotSet();
@@ -391,27 +332,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         );
     }
 
-    function _sendRedeemRequest(
-        address currency,
-        uint16 dstChainId,
-        uint256 amount,
-        bytes calldata adapterParams
-    ) internal {
-        // This would interact with the engine contract on the destination chain to redeem
-        address engineAddress = engineAddresses[currency][dstChainId];
-        if (engineAddress == address(0)) {
-            revert TorqueBatchHandler__EngineNotSet();
-        }
-        bytes memory payload = abi.encode(currency, msg.sender, amount);
-        MessagingFee memory fee = _quote(dstChainId, payload, adapterParams, false);
-        _lzSend(
-            dstChainId,
-            payload,
-            adapterParams,
-            fee,
-            payable(msg.sender)
-        );
-    }
+
     
     /**
      * @dev Get batch mint quote (gas estimation)
@@ -634,7 +555,7 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
     }
     
     /**
-     * @dev Emergency function to recover stuck tokens
+     * @dev Emergency function to recover stuck Torque currencies
      */
     function emergencyWithdraw(
         address token,
