@@ -101,10 +101,12 @@ export const collateralTokens: CollateralToken[] = [
     symbol: "PYUSD",
     name: "PayPal USD",
     contracts: {
-      ethereum: "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8"
+      ethereum: "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
+      arbitrum: "0x46850aD61C2B7d64d08c9C754F45254596696984"
     },
     priceFeeds: {
-      ethereum: "0x8f1dF6D7F2db73eECE86a18b4381F4707b918FB1"
+      ethereum: "0x8f1dF6D7F2db73eECE86a18b4381F4707b918FB1",
+      arbitrum: "0x..."
     }
   },
   {

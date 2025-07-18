@@ -84,9 +84,16 @@ async function main() {
     8453: "0x2330aaE3bca5F05169d5f4597964D44522F62930" // Base
   };
   
-  // PayPal USD (PYUSD)
-  const PYUSD_ADDRESS = "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8"; // PYUSD on mainnet
-  const PYUSD_PRICE_FEED = "0x8f1dF6D7F2db73eECE86a18b4381F4707b918FB1"; // PYUSD/USD on mainnet
+  // PayPal USD (PYUSD) - Multi-chain support
+  const PYUSD_ADDRESSES: { [chainId: number]: string } = {
+    1: "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8", // Ethereum mainnet
+    42161: "0x46850aD61C2B7d64d08c9C754F45254596696984" // Arbitrum One
+  };
+  
+  const PYUSD_PRICE_FEEDS: { [chainId: number]: string } = {
+    1: "0x8f1dF6D7F2db73eECE86a18b4381F4707b918FB1", // Ethereum mainnet
+    42161: "0x..." // Placeholder until feed is available
+  };
 
   // ===== ETH DERIVATIVES (80% liquidation threshold) =====
   
@@ -303,16 +310,19 @@ async function main() {
     const usdtPriceFeed = USDT_PRICE_FEEDS[currentChainId] || "0x0000000000000000000000000000000000000000";
     const usdsAddress = USDS_ADDRESSES[currentChainId] || "0x0000000000000000000000000000000000000000";
     const usdsPriceFeed = USDS_PRICE_FEEDS[currentChainId] || "0x0000000000000000000000000000000000000000";
+    const pyusdAddress = PYUSD_ADDRESSES[currentChainId] || "0x0000000000000000000000000000000000000000";
+    const pyusdPriceFeed = PYUSD_PRICE_FEEDS[currentChainId] || "0x0000000000000000000000000000000000000000";
     
     console.log(`📋 USDC Address: ${usdcAddress}`);
     console.log(`📋 USDT Address: ${usdtAddress}`);
     console.log(`📋 USDS Address: ${usdsAddress}`);
+    console.log(`📋 PYUSD Address: ${pyusdAddress}`);
     
     const stablecoins = [
       { name: "USDC", address: usdcAddress, priceFeed: usdcPriceFeed, decimals: 6, needsEthConversion: false },
       { name: "USDT", address: usdtAddress, priceFeed: usdtPriceFeed, decimals: 6, needsEthConversion: false },
       { name: "USDS", address: usdsAddress, priceFeed: usdsPriceFeed, decimals: 6, needsEthConversion: false },
-      { name: "PYUSD", address: PYUSD_ADDRESS, priceFeed: PYUSD_PRICE_FEED, decimals: 6, needsEthConversion: false }
+      { name: "PYUSD", address: pyusdAddress, priceFeed: pyusdPriceFeed, decimals: 6, needsEthConversion: false }
     ];
     
     for (const stablecoin of stablecoins) {
