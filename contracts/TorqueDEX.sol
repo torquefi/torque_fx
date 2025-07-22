@@ -8,28 +8,22 @@ import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 import "./TorqueLP.sol";
 
 contract TorqueDEX is OApp, ReentrancyGuard {
-
     
-    // Pool management
     mapping(bytes32 => Pool) public pools;
     mapping(address => bool) public isPool;
     address[] public allPools;
-    // Track number of ranges per user
     mapping(address => uint256) public userRangeCount;
     
     address public defaultQuoteAsset;
     bool public defaultQuoteAssetSet = false;
     
-    // Default parameters
     address public defaultFeeRecipient;
-    uint256 public defaultFeeBps = 4; // 0.04%
+    uint256 public defaultFeeBps = 4;
     bool public defaultIsStablePair = false;
     
-    // Cross-chain DEX addresses
     mapping(uint16 => address) public dexAddresses;
     mapping(uint16 => bool) public supportedChainIds;
     
-    // Pool structure
     struct Pool {
         address baseToken;
         address quoteToken;
@@ -41,10 +35,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint256 totalLiquidity;
         mapping(int256 => Tick) ticks;
         mapping(address => mapping(uint256 => Range[])) userRanges;
-        int256 currentTick;
-        uint256 currentSqrtPriceX96;
         
-        // Volume and fee tracking
         uint256 volume24h;
         uint256 volume7d;
         uint256 volume30d;
@@ -54,13 +45,11 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint256 lastVolumeUpdate;
         uint256 lastFeeUpdate;
         
-        // Participant tracking
         uint256 totalParticipants;
         mapping(address => bool) participants;
     }
     
     struct Tick {
-        uint256 liquidityNet;
         uint256 liquidityGross;
         int256 tickIdx;
         uint256 sqrtPriceX96;
@@ -86,14 +75,9 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         bool isAdd;
     }
 
-    // Stable pair parameters
     uint256 public constant A = 1000;
     uint256 public constant PRECISION = 1e18;
-    uint256 private constant LIQUIDATION_THRESHOLD = 98;
-    uint256 private constant LIQUIDATION_BONUS = 20;
-    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
-    // Events
     event PoolCreated(
         address indexed baseToken,
         address indexed quoteToken,
@@ -103,6 +87,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint256 feeBps,
         address feeRecipient
     );
+    
     event PoolDeactivated(address indexed baseToken, address indexed quoteToken);
     event LiquidityAdded(address indexed user, address indexed baseToken, address indexed quoteToken, uint256 amount0, uint256 amount1, uint256 liquidity);
     event LiquidityRemoved(address indexed user, address indexed baseToken, address indexed quoteToken, uint256 liquidity, uint256 amount0, uint256 amount1);
@@ -113,10 +98,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     event DefaultFeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
     event DefaultFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event DefaultIsStablePairUpdated(bool oldIsStable, bool newIsStable);
-    
 
-    
-    // Cross-chain events
     event CrossChainLiquidityRequested(
         address indexed user,
         address indexed baseToken,
@@ -146,13 +128,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         string reason
     );
 
-    // Volume tracking events
     event VolumeUpdated(address indexed baseToken, address indexed quoteToken, uint256 volume24h, uint256 volume7d, uint256 volume30d);
     event FeesUpdated(address indexed baseToken, address indexed quoteToken, uint256 fees24h, uint256 fees7d, uint256 fees30d);
     event ParticipantAdded(address indexed baseToken, address indexed quoteToken, address indexed participant);
-    event ParticipantRemoved(address indexed baseToken, address indexed quoteToken, address indexed participant);
 
-    // Errors
     error TorqueDEX__DefaultQuoteAssetNotSet();
     error TorqueDEX__InvalidTokens();
     error TorqueDEX__InvalidFeeRecipient();
@@ -163,12 +142,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     error TorqueDEX__UnsupportedChain();
     error TorqueDEX__CrossChainLiquidityFailed();
 
-
     constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) Ownable(_owner) ReentrancyGuard() {}
 
-    /**
-     * @dev Set the default quote asset (e.g., TUSD)
-     */
     function setDefaultQuoteAsset(address _defaultQuoteAsset) external onlyOwner {
         if (_defaultQuoteAsset == address(0)) {
             revert TorqueDEX__InvalidTokens();
@@ -181,9 +156,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         emit DefaultQuoteAssetSet(oldQuoteAsset, _defaultQuoteAsset);
     }
     
-    /**
-     * @dev Create a new trading pool for any token pair
-     */
     function createPool(
         address baseToken,
         address quoteToken,
@@ -193,7 +165,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         bool isStablePair,
         uint256 customFeeBps
     ) external onlyOwner returns (address lpTokenAddress) {
-        // Validations
         if (baseToken == address(0) || quoteToken == address(0)) {
             revert TorqueDEX__InvalidTokens();
         }
@@ -203,25 +174,21 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         if (feeRecipient == address(0)) {
             revert TorqueDEX__InvalidFeeRecipient();
         }
-        if (customFeeBps > 1000) { // Max 10%
+        if (customFeeBps > 1000) {
             revert("Fee too high");
         }
         
-        // Check if pair already exists
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         if (pools[pairHash].active) {
             revert TorqueDEX__PairAlreadyExists();
         }
         
-        // Create unique LP token name and symbol
         string memory lpName = string(abi.encodePacked("Torque ", pairName, " LP"));
         string memory lpSymbol = string(abi.encodePacked("T", pairSymbol));
         
-        // Deploy LP token
         TorqueLP lpToken = new TorqueLP(lpName, lpSymbol, address(endpoint), owner());
         lpToken.setDEX(address(this));
         
-        // Create pool
         Pool storage pool = pools[pairHash];
         pool.baseToken = baseToken;
         pool.quoteToken = quoteToken;
@@ -231,8 +198,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         pool.isStablePair = isStablePair;
         pool.active = true;
         pool.totalLiquidity = 0;
-        pool.currentTick = 0;
-        pool.currentSqrtPriceX96 = 0;
         
         isPool[address(lpToken)] = true;
         allPools.push(address(lpToken));
@@ -250,9 +215,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return address(lpToken);
     }
     
-    /**
-     * @dev Create pool with default quote asset (TUSD)
-     */
     function createPoolWithDefaultQuote(
         address baseToken,
         string memory pairName,
@@ -272,10 +234,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         );
     }
     
-    /**
-     * @dev Get pool info for a token pair
-     * Returns only non-mapping fields.
-     */
     function getPool(address baseToken, address quoteToken) external view returns (
         address baseToken_,
         address quoteToken_,
@@ -284,9 +242,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         address feeRecipient_,
         bool isStablePair_,
         bool active_,
-        uint256 totalLiquidity_,
-        int256 currentTick_,
-        uint256 currentSqrtPriceX96_
+        uint256 totalLiquidity_
     ) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -301,15 +257,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             pool.feeRecipient,
             pool.isStablePair,
             pool.active,
-            pool.totalLiquidity,
-            pool.currentTick,
-            pool.currentSqrtPriceX96
+            pool.totalLiquidity
         );
     }
     
-    /**
-     * @dev Get pool address for a token pair
-     */
     function getPoolAddress(address baseToken, address quoteToken) external view returns (address) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -319,31 +270,19 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return pool.lpToken;
     }
     
-    /**
-     * @dev Get all pool addresses
-     */
     function getAllPools() external view returns (address[] memory) {
         return allPools;
     }
     
-    /**
-     * @dev Get total number of pools
-     */
     function getPoolCount() external view returns (uint256) {
         return allPools.length;
     }
     
-    /**
-     * @dev Check if a token pair has a pool
-     */
     function hasPool(address baseToken, address quoteToken) external view returns (bool) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         return pools[pairHash].active;
     }
     
-    /**
-     * @dev Deactivate a pool
-     */
     function deactivatePool(address baseToken, address quoteToken) external onlyOwner {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -354,9 +293,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         emit PoolDeactivated(baseToken, quoteToken);
     }
     
-    /**
-     * @dev Swap tokens in a pool
-     */
     function swap(
         address baseToken,
         address quoteToken,
@@ -370,40 +306,31 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__PoolNotFound();
         }
         
-        // Validate tokens
         if (tokenIn != pool.baseToken && tokenIn != pool.quoteToken) {
             revert TorqueDEX__InvalidTokens();
         }
         
         address tokenOut = tokenIn == pool.baseToken ? pool.quoteToken : pool.baseToken;
         
-        // Transfer tokens in
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         
-        // Calculate swap amount with proper AMM math
         if (pool.isStablePair) {
             amountOut = _calculateStableSwapAmount(pool, tokenIn, amountIn);
         } else {
             amountOut = _calculateSwapAmount(pool, tokenIn, amountIn);
         }
         
-        // Calculate price impact for monitoring
-        uint256 priceImpact = _calculatePriceImpact(pool, tokenIn, amountIn, amountOut);
-        
         if (amountOut < minAmountOut) {
             revert TorqueDEX__SlippageExceeded();
         }
         
-        // Transfer tokens out
         IERC20(tokenOut).transfer(msg.sender, amountOut);
         
-        // Collect fees
         uint256 fee = (amountIn * pool.feeBps) / 10000;
         if (fee > 0) {
             IERC20(tokenIn).transfer(pool.feeRecipient, fee);
         }
         
-        // Update volume and fee statistics
         _updateVolumeStats(pool, amountIn);
         _updateFeeStats(pool, fee);
         
@@ -412,9 +339,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return amountOut;
     }
     
-    /**
-     * @dev Add liquidity to a pool
-     */
     function addLiquidity(
         address baseToken,
         address quoteToken,
@@ -429,19 +353,15 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__PoolNotFound();
         }
         
-        // Transfer tokens
         IERC20(pool.baseToken).transferFrom(msg.sender, address(this), amount0);
         IERC20(pool.quoteToken).transferFrom(msg.sender, address(this), amount1);
         
-        // Calculate liquidity (simplified)
         liquidity = _calculateLiquidity(amount0, amount1, lowerTick, upperTick);
         
-        // Update pool state
         pool.totalLiquidity += liquidity;
         pool.ticks[lowerTick].liquidityGross += liquidity;
         pool.ticks[upperTick].liquidityGross += liquidity;
         
-        // Add user range
         Range memory newRange = Range({
             lowerTick: lowerTick,
             upperTick: upperTick,
@@ -453,10 +373,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         pool.userRanges[msg.sender][rangeIndex].push(newRange);
         userRangeCount[msg.sender]++;
         
-        // Add participant tracking
         _addParticipant(pool, msg.sender);
         
-        // Mint LP tokens
         TorqueLP(pool.lpToken).mint(msg.sender, liquidity);
         
         emit LiquidityAdded(msg.sender, baseToken, quoteToken, amount0, amount1, liquidity);
@@ -465,9 +383,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return liquidity;
     }
     
-    /**
-     * @dev Remove liquidity from a pool
-     */
     function removeLiquidity(
         address baseToken,
         address quoteToken,
@@ -480,14 +395,11 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__PoolNotFound();
         }
         
-        // Burn LP tokens
         TorqueLP(pool.lpToken).burn(msg.sender, liquidity);
         
-        // Get user range
         Range[] storage ranges = pool.userRanges[msg.sender][rangeIndex];
         require(ranges.length > 0, "No ranges found");
         
-        // Find the range with sufficient liquidity
         uint256 foundRangeIndex = 0;
         bool rangeFound = false;
         for (uint256 i = 0; i < ranges.length; i++) {
@@ -500,26 +412,21 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         require(rangeFound, "Insufficient liquidity in any range");
         Range storage range = ranges[foundRangeIndex];
         
-        // Calculate amounts based on liquidity proportion
         amount0 = (range.amount0 * liquidity) / range.liquidity;
         amount1 = (range.amount1 * liquidity) / range.liquidity;
         
-        // Validate amounts
         if (amount0 == 0 && amount1 == 0) {
             revert("No tokens to remove");
         }
         
-        // Update pool state
         pool.totalLiquidity -= liquidity;
         pool.ticks[range.lowerTick].liquidityGross -= liquidity;
         pool.ticks[range.upperTick].liquidityGross -= liquidity;
         
-        // Update range
         range.liquidity -= liquidity;
         range.amount0 -= amount0;
         range.amount1 -= amount1;
         
-        // Transfer tokens
         IERC20(pool.baseToken).transfer(msg.sender, amount0);
         IERC20(pool.quoteToken).transfer(msg.sender, amount1);
         
@@ -529,9 +436,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return (amount0, amount1);
     }
 
-    /**
-     * @dev Add liquidity to multiple chains in a single transaction
-     */
     function addCrossChainLiquidity(
         address baseToken,
         address quoteToken,
@@ -562,11 +466,9 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 revert TorqueDEX__UnsupportedChain();
             }
 
-            // Transfer tokens to this contract first
             IERC20(pool.baseToken).transferFrom(msg.sender, address(this), amounts0[i]);
             IERC20(pool.quoteToken).transferFrom(msg.sender, address(this), amounts1[i]);
 
-            // Send cross-chain liquidity request
             _sendCrossChainLiquidityRequest(
                 dstChainIds[i],
                 msg.sender,
@@ -576,7 +478,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 amounts1[i],
                 lowerTicks[i],
                 upperTicks[i],
-                true, // isAdd
+                true,
                 adapterParams[i]
             );
 
@@ -594,9 +496,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Remove liquidity from multiple chains
-     */
     function removeCrossChainLiquidity(
         address baseToken,
         address quoteToken,
@@ -621,7 +520,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 revert TorqueDEX__UnsupportedChain();
             }
 
-            // Send cross-chain liquidity removal request
             _sendCrossChainLiquidityRequest(
                 dstChainIds[i],
                 msg.sender,
@@ -631,7 +529,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 0,
                 0,
                 0,
-                false, // isRemove
+                false,
                 adapterParams[i]
             );
 
@@ -649,9 +547,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Send cross-chain liquidity request
-     */
     function _sendCrossChainLiquidityRequest(
         uint16 dstChainId,
         address user,
@@ -672,7 +567,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             amount1: amount1,
             lowerTick: lowerTick,
             upperTick: upperTick,
-            sourceChainId: 0, // Will be set in _lzReceive
+            sourceChainId: 0,
             isAdd: isAdd
         });
 
@@ -685,9 +580,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Handle cross-chain liquidity requests
-     */
     function _lzReceive(
         Origin calldata _origin,
         bytes32 _guid,
@@ -698,7 +590,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         CrossChainLiquidityRequest memory request = abi.decode(_message, (CrossChainLiquidityRequest));
         request.sourceChainId = uint16(_origin.srcEid);
 
-        // Process cross-chain liquidity request
         if (request.isAdd) {
             _processCrossChainLiquidityAdd(request);
         } else {
@@ -721,7 +612,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             return;
         }
 
-        // Calculate liquidity
         uint256 liquidity = _calculateLiquidity(
             request.amount0,
             request.amount1,
@@ -729,12 +619,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             request.upperTick
         );
 
-        // Update pool state
         pool.totalLiquidity += liquidity;
         pool.ticks[request.lowerTick].liquidityGross += liquidity;
         pool.ticks[request.upperTick].liquidityGross += liquidity;
 
-        // Mint LP tokens to user
         TorqueLP(pool.lpToken).mint(request.user, liquidity);
 
         emit CrossChainLiquidityCompleted(
@@ -749,10 +637,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Process cross-chain liquidity removal with specific range matching
-     * This function handles the complex logic to find and remove specific user ranges
-     */
     function _processCrossChainLiquidityRemove(CrossChainLiquidityRequest memory request) internal {
         bytes32 pairHash = keccak256(abi.encodePacked(request.baseToken, request.quoteToken));
         Pool storage pool = pools[pairHash];
@@ -768,28 +652,23 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             return;
         }
 
-        // Find and remove the user's liquidity ranges
         uint256 totalLiquidityRemoved = 0;
         uint256 totalAmount0Removed = 0;
         uint256 totalAmount1Removed = 0;
         bool liquidityFound = false;
 
-        // Determine removal strategy based on request parameters
         bool removeAllLiquidity = (request.amount0 == 0 && request.amount1 == 0 && 
                                   request.lowerTick == 0 && request.upperTick == 0);
         bool removeSpecificRange = !removeAllLiquidity && 
                                  (request.lowerTick != 0 || request.upperTick != 0);
 
-        // Iterate through all range indices for this user
         uint256 userRangeCountValue = userRangeCount[request.user];
         for (uint256 rangeIndex = 0; rangeIndex < userRangeCountValue; rangeIndex++) {
             Range[] storage userRanges = pool.userRanges[request.user][rangeIndex];
             
-            // Iterate through all ranges in this index
             for (uint256 i = 0; i < userRanges.length; i++) {
                 Range storage range = userRanges[i];
                 
-                // Skip if no liquidity in this range
                 if (range.liquidity == 0) {
                     continue;
                 }
@@ -800,13 +679,11 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 uint256 amount1ToRemove = 0;
 
                 if (removeAllLiquidity) {
-                    // Remove all liquidity from all ranges
                     shouldRemoveRange = true;
                     liquidityToRemove = range.liquidity;
                     amount0ToRemove = range.amount0;
                     amount1ToRemove = range.amount1;
                 } else if (removeSpecificRange) {
-                    // Remove liquidity from specific tick range
                     if (range.lowerTick == request.lowerTick && range.upperTick == request.upperTick) {
                         shouldRemoveRange = true;
                         liquidityToRemove = range.liquidity;
@@ -814,9 +691,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                         amount1ToRemove = range.amount1;
                     }
                 } else {
-                    // Remove liquidity based on amount criteria
                     if (request.amount0 > 0 && request.amount1 > 0) {
-                        // Remove proportional liquidity based on amounts
                         uint256 liquidityRatio = _calculateLiquidityRatio(range, request.amount0, request.amount1);
                         if (liquidityRatio > 0) {
                             shouldRemoveRange = true;
@@ -828,17 +703,14 @@ contract TorqueDEX is OApp, ReentrancyGuard {
                 }
 
                 if (shouldRemoveRange && liquidityToRemove > 0) {
-                    // Update pool state
                     pool.totalLiquidity -= liquidityToRemove;
                     pool.ticks[range.lowerTick].liquidityGross -= liquidityToRemove;
                     pool.ticks[range.upperTick].liquidityGross -= liquidityToRemove;
                     
-                    // Update range
                     range.liquidity -= liquidityToRemove;
                     range.amount0 -= amount0ToRemove;
                     range.amount1 -= amount1ToRemove;
                     
-                    // Accumulate totals
                     totalLiquidityRemoved += liquidityToRemove;
                     totalAmount0Removed += amount0ToRemove;
                     totalAmount1Removed += amount1ToRemove;
@@ -858,10 +730,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             return;
         }
 
-        // Burn LP tokens from the user
         TorqueLP(pool.lpToken).burn(request.user, totalLiquidityRemoved);
 
-        // Transfer tokens back to the user
         if (totalAmount0Removed > 0) {
             IERC20(pool.baseToken).transfer(request.user, totalAmount0Removed);
         }
@@ -881,11 +751,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Calculate stable swap output amount using Stableswap formula
-     * Implements the Stableswap invariant for stable pairs
-     * Note: amountIn is already after fees when called from the main swap function
-     */
     function _calculateStableSwapAmount(Pool storage pool, address tokenIn, uint256 amountIn) internal view returns (uint256) {
         uint256 reserveIn = tokenIn == pool.baseToken ? 
             IERC20(pool.baseToken).balanceOf(address(this)) : 
@@ -898,17 +763,14 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__InsufficientLiquidity();
         }
         
-        // amountIn is already after fees when called from the main swap function
         uint256 amountInAfterFee = amountIn;
         
-        // Stableswap formula: (x + dx) * (y - dy) = x * y with amplification
         uint256 amplification = A;
         uint256 d = _calculateStableInvariant(reserveIn, reserveOut, amplification);
         
         uint256 newReserveIn = reserveIn + amountInAfterFee;
         uint256 newD = _calculateStableInvariant(newReserveIn, reserveOut, amplification);
         
-        // Calculate dy using the invariant
         uint256 dy = reserveOut - _calculateStableY(newReserveIn, newD, amplification);
         
         if (dy >= reserveOut) {
@@ -918,9 +780,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return dy;
     }
     
-    /**
-     * @dev Calculate Stableswap invariant
-     */
     function _calculateStableInvariant(uint256 x, uint256 y, uint256 amplification) internal pure returns (uint256) {
         uint256 sum = x + y;
         if (sum == 0) return 0;
@@ -931,9 +790,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return (product * amplificationFactor) / (sum * PRECISION);
     }
     
-    /**
-     * @dev Calculate y from x and invariant for Stableswap
-     */
     function _calculateStableY(uint256 x, uint256 d, uint256 amplification) internal pure returns (uint256) {
         if (x == 0) return 0;
         
@@ -948,17 +804,11 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return y;
     }
     
-    /**
-     * @dev Calculate swap output amount using constant product AMM formula
-     * Implements the x * y = k formula
-     * Note: amountIn is already after fees when called from the main swap function
-     */
     function _calculateSwapAmount(Pool storage pool, address tokenIn, uint256 amountIn) internal view returns (uint256) {
         if (pool.totalLiquidity == 0) {
             revert TorqueDEX__InsufficientLiquidity();
         }
         
-        // Get current reserves
         uint256 reserveIn = tokenIn == pool.baseToken ? 
             IERC20(pool.baseToken).balanceOf(address(this)) : 
             IERC20(pool.quoteToken).balanceOf(address(this));
@@ -970,14 +820,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__InsufficientLiquidity();
         }
         
-        // amountIn is already after fees when called from the main swap function
         uint256 amountInAfterFee = amountIn;
         
-        // Constant product formula: (x + dx) * (y - dy) = x * y
-        // dy = (y * dx) / (x + dx)
         uint256 amountOut = (reserveOut * amountInAfterFee) / (reserveIn + amountInAfterFee);
         
-        // Ensure minimum output
         if (amountOut >= reserveOut) {
             revert TorqueDEX__InsufficientLiquidity();
         }
@@ -985,10 +831,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return amountOut;
     }
 
-    /**
-     * @dev Calculate liquidity based on amounts and tick range
-     * Uses the geometric mean formula for concentrated liquidity
-     */
     function _calculateLiquidity(uint256 amount0, uint256 amount1, int256 lowerTick, int256 upperTick) internal pure returns (uint256) {
         if (lowerTick >= upperTick) {
             revert("Invalid tick range");
@@ -998,7 +840,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             return 0;
         }
         
-        // Calculate sqrt prices for the tick range
         uint256 sqrtPriceLower = _getSqrtPriceAtTick(lowerTick);
         uint256 sqrtPriceUpper = _getSqrtPriceAtTick(upperTick);
         
@@ -1006,30 +847,22 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert("Invalid sqrt prices");
         }
         
-        // Calculate liquidity using the formula:
-        // L = sqrt(amount0 * amount1) / (sqrt(P_upper) - sqrt(P_lower))
         uint256 liquidity;
         
         if (amount0 > 0 && amount1 > 0) {
-            // Both amounts provided - use geometric mean
             uint256 product = amount0 * amount1;
             uint256 sqrtProduct = _sqrt(product);
             uint256 priceDiff = sqrtPriceUpper - sqrtPriceLower;
             liquidity = (sqrtProduct * 2**96) / priceDiff;
         } else if (amount0 > 0) {
-            // Only amount0 provided
             liquidity = (amount0 * 2**96) / (sqrtPriceUpper - sqrtPriceLower);
         } else {
-            // Only amount1 provided
             liquidity = (amount1 * 2**96) / (sqrtPriceUpper - sqrtPriceLower);
         }
         
         return liquidity;
     }
     
-    /**
-     * @dev Calculate square root using Babylonian method
-     */
     function _sqrt(uint256 x) internal pure returns (uint256) {
         if (x == 0) return 0;
         
@@ -1044,10 +877,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return y;
     }
     
-    /**
-     * @dev Get sqrt price at a given tick using proper Uniswap V3 math
-     * Uses the formula: sqrt(1.0001^tick) * 2^96
-     */
     function _getSqrtPriceAtTick(int256 tick) internal pure returns (uint256) {
         require(tick >= -887272 && tick <= 887272, "Tick out of bounds");
         
@@ -1080,176 +909,17 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         return uint256(uint128(ratio));
     }
     
-    /**
-     * @dev Get tick from sqrt price using proper Uniswap V3 math
-     * Inverse of _getSqrtPriceAtTick
-     */
-    function _getTickAtSqrtPrice(uint256 sqrtPriceX96) internal pure returns (int256) {
-        require(sqrtPriceX96 >= 4295128739, "Price too low");
-        require(sqrtPriceX96 <= 1461446703485210103287273052203988822378723970342, "Price too high");
-        
-        uint256 ratio = uint256(sqrtPriceX96) << 32;
-        
-        uint256 r = ratio;
-        uint256 msb = 0;
-        
-        assembly {
-            let f := shl(7, gt(r, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := shl(6, gt(r, 0xFFFFFFFFFFFFFFFF))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := shl(5, gt(r, 0xFFFFFFFF))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := shl(4, gt(r, 0xFFFF))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := shl(3, gt(r, 0xFF))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := shl(2, gt(r, 0xF))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := shl(1, gt(r, 0x3))
-            msb := or(msb, f)
-            r := shr(f, r)
-        }
-        assembly {
-            let f := gt(r, 0x1)
-            msb := or(msb, f)
-        }
-        
-        if (msb >= 128) r = ratio >> (msb - 127);
-        else r = ratio << (127 - msb);
-        
-        int256 log_2 = (int256(msb) - 128) << 64;
-        
-        int256 log_sqrt10001 = log_2;
-        log_sqrt10001 = (log_sqrt10001 * 255738958999603826347141) >> 128;
-        int256 tickLow = (log_sqrt10001 - 340299295680913241859614010066329721600) >> 128;
-        int256 tickHigh = (log_sqrt10001 + 291339464771989622907027621153398088495) >> 128;
-        
-        tickLow = tickLow == tickHigh ? tickLow : _getSqrtPriceAtTick(tickLow) <= sqrtPriceX96 ? tickLow : tickHigh;
-        tickHigh = tickLow == tickHigh ? tickHigh : _getSqrtPriceAtTick(tickHigh) > sqrtPriceX96 ? tickHigh : tickLow;
-        
-        return tickLow;
-    }
-    
-    /**
-     * @dev Calculate price impact of a swap
-     */
-    function _calculatePriceImpact(Pool storage pool, address tokenIn, uint256 amountIn, uint256 amountOut) internal view returns (uint256) {
-        uint256 reserveIn = tokenIn == pool.baseToken ? 
-            IERC20(pool.baseToken).balanceOf(address(this)) : 
-            IERC20(pool.quoteToken).balanceOf(address(this));
-        uint256 reserveOut = tokenIn == pool.baseToken ? 
-            IERC20(pool.quoteToken).balanceOf(address(this)) : 
-            IERC20(pool.baseToken).balanceOf(address(this));
-        
-        if (reserveIn == 0 || reserveOut == 0) {
-            return 0;
-        }
-        
-        // Calculate price before swap
-        uint256 priceBefore = (reserveOut * 1e18) / reserveIn;
-        
-        // Calculate price after swap
-        uint256 newReserveIn = reserveIn + amountIn;
-        uint256 newReserveOut = reserveOut - amountOut;
-        uint256 priceAfter = (newReserveOut * 1e18) / newReserveIn;
-        
-        // Calculate price impact as percentage
-        if (priceBefore > priceAfter) {
-            return ((priceBefore - priceAfter) * 10000) / priceBefore;
-        } else {
-            return ((priceAfter - priceBefore) * 10000) / priceBefore;
-        }
-    }
-
-    /**
-     * @dev Calculate amounts from liquidity using proper AMM math
-     */
-    function _calculateAmountsFromLiquidity(
-        uint256 liquidity,
-        int256 lowerTick,
-        int256 upperTick,
-        uint256 currentSqrtPriceX96
-    ) internal pure returns (uint256 amount0, uint256 amount1) {
-        if (liquidity == 0) {
-            return (0, 0);
-        }
-        
-        uint256 sqrtPriceLowerX96 = _getSqrtPriceAtTick(lowerTick);
-        uint256 sqrtPriceUpperX96 = _getSqrtPriceAtTick(upperTick);
-        
-        if (currentSqrtPriceX96 <= sqrtPriceLowerX96) {
-            // Current price is below range - only token0
-            amount0 = _getLiquidityForAmount0(liquidity, sqrtPriceLowerX96, sqrtPriceUpperX96);
-        } else if (currentSqrtPriceX96 >= sqrtPriceUpperX96) {
-            // Current price is above range - only token1
-            amount1 = _getLiquidityForAmount1(liquidity, sqrtPriceLowerX96, sqrtPriceUpperX96);
-        } else {
-            // Current price is within range - both tokens
-            amount0 = _getLiquidityForAmount0(liquidity, currentSqrtPriceX96, sqrtPriceUpperX96);
-            amount1 = _getLiquidityForAmount1(liquidity, sqrtPriceLowerX96, currentSqrtPriceX96);
-        }
-    }
-    
-    /**
-     * @dev Calculate amount0 from liquidity
-     */
-    function _getLiquidityForAmount0(
-        uint256 liquidity,
-        uint256 sqrtPriceAX96,
-        uint256 sqrtPriceBX96
-    ) internal pure returns (uint256) {
-        uint256 numerator = liquidity * (sqrtPriceBX96 - sqrtPriceAX96);
-        uint256 denominator = sqrtPriceBX96;
-        return numerator / denominator;
-    }
-    
-    /**
-     * @dev Calculate amount1 from liquidity
-     */
-    function _getLiquidityForAmount1(
-        uint256 liquidity,
-        uint256 sqrtPriceAX96,
-        uint256 sqrtPriceBX96
-    ) internal pure returns (uint256) {
-        return liquidity * (sqrtPriceBX96 - sqrtPriceAX96) / 2**96;
-    }
-    
-    /**
-     * @dev Calculate liquidity ratio for proportional removal
-     */
     function _calculateLiquidityRatio(Range storage range, uint256 targetAmount0, uint256 targetAmount1) internal view returns (uint256) {
         if (range.liquidity == 0) {
             return 0;
         }
         
-        // Calculate ratios for both amounts
         uint256 ratio0 = range.amount0 > 0 ? (targetAmount0 * 10000) / range.amount0 : 0;
         uint256 ratio1 = range.amount1 > 0 ? (targetAmount1 * 10000) / range.amount1 : 0;
         
-        // Return the minimum ratio to ensure we don't over-remove
         return ratio0 < ratio1 ? ratio0 : ratio1;
     }
 
-    // Admin functions
     function setDefaultFeeRecipient(address _feeRecipient) external onlyOwner {
         if (_feeRecipient == address(0)) {
             revert TorqueDEX__InvalidFeeRecipient();
@@ -1260,7 +930,7 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     }
 
     function setDefaultFeeBps(uint256 _feeBps) external onlyOwner {
-        require(_feeBps <= 1000, "Fee too high"); // Max 10%
+        require(_feeBps <= 1000, "Fee too high");
         uint256 oldFeeBps = defaultFeeBps;
         defaultFeeBps = _feeBps;
         emit DefaultFeeBpsUpdated(oldFeeBps, _feeBps);
@@ -1282,9 +952,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         delete dexAddresses[chainId];
     }
     
-    /**
-     * @dev Internal function to get user ranges for a specific pool
-     */
     function _getUserRanges(
         address user,
         address baseToken,
@@ -1311,9 +978,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
         return ranges;
     }
-    /**
-     * @dev External wrapper for getUserRanges
-     */
     function getUserRanges(
         address user,
         address baseToken,
@@ -1321,9 +985,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
     ) external view returns (Range[] memory) {
         return _getUserRanges(user, baseToken, quoteToken);
     }
-    /**
-     * @dev Internal function to get current price for a token pair
-     */
     function _getPrice(address baseToken, address quoteToken) internal view returns (uint256 price) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -1342,16 +1003,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
         return price;
     }
-    /**
-     * @dev External wrapper for getPrice
-     */
     function getPrice(address baseToken, address quoteToken) external view returns (uint256 price) {
         return _getPrice(baseToken, quoteToken);
     }
     
-    /**
-     * @dev Get pool reserves
-     */
     function getPoolReserves(address baseToken, address quoteToken) external view returns (uint256 reserve0, uint256 reserve1) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -1363,9 +1018,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         reserve1 = IERC20(pool.quoteToken).balanceOf(address(this));
     }
     
-    /**
-     * @dev Get pool fee information
-     */
     function getPoolFees(address baseToken, address quoteToken) external view returns (uint256 feeBps, address feeRecipient) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -1377,31 +1029,24 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         feeRecipient = pool.feeRecipient;
     }
     
-    /**
-     * @dev Update volume statistics for a pool
-     * Called internally after swaps
-     */
     function _updateVolumeStats(
         Pool storage pool,
         uint256 volumeAmount
     ) internal {
         uint256 currentTime = block.timestamp;
         
-        // Update 24h volume (rolling window)
         if (currentTime - pool.lastVolumeUpdate >= 1 days) {
             pool.volume24h = volumeAmount;
         } else {
             pool.volume24h += volumeAmount;
         }
         
-        // Update 7d volume (rolling window)
         if (currentTime - pool.lastVolumeUpdate >= 7 days) {
             pool.volume7d = volumeAmount;
         } else {
             pool.volume7d += volumeAmount;
         }
         
-        // Update 30d volume (rolling window)
         if (currentTime - pool.lastVolumeUpdate >= 30 days) {
             pool.volume30d = volumeAmount;
         } else {
@@ -1413,31 +1058,24 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         emit VolumeUpdated(pool.baseToken, pool.quoteToken, pool.volume24h, pool.volume7d, pool.volume30d);
     }
 
-    /**
-     * @dev Update fee statistics for a pool
-     * Called internally after swaps
-     */
     function _updateFeeStats(
         Pool storage pool,
         uint256 feeAmount
     ) internal {
         uint256 currentTime = block.timestamp;
         
-        // Update 24h fees (rolling window)
         if (currentTime - pool.lastFeeUpdate >= 1 days) {
             pool.fees24h = feeAmount;
         } else {
             pool.fees24h += feeAmount;
         }
         
-        // Update 7d fees (rolling window)
         if (currentTime - pool.lastFeeUpdate >= 7 days) {
             pool.fees7d = feeAmount;
         } else {
             pool.fees7d += feeAmount;
         }
         
-        // Update 30d fees (rolling window)
         if (currentTime - pool.lastFeeUpdate >= 30 days) {
             pool.fees30d = feeAmount;
         } else {
@@ -1449,10 +1087,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         emit FeesUpdated(pool.baseToken, pool.quoteToken, pool.fees24h, pool.fees7d, pool.fees30d);
     }
 
-    /**
-     * @dev Add participant to pool
-     * Called internally when user adds liquidity
-     */
     function _addParticipant(
         Pool storage pool,
         address participant
@@ -1464,24 +1098,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Remove participant from pool
-     * Called internally when user removes all liquidity
-     */
-    function _removeParticipant(
-        Pool storage pool,
-        address participant
-    ) internal {
-        if (pool.participants[participant]) {
-            pool.participants[participant] = false;
-            pool.totalParticipants--;
-            emit ParticipantRemoved(pool.baseToken, pool.quoteToken, participant);
-        }
-    }
-
-    /**
-     * @dev Get comprehensive pool statistics for frontend
-     */
     function getPoolStats(address baseToken, address quoteToken) external view returns (
         uint256 volume24h,
         uint256 volume7d,
@@ -1508,7 +1124,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         totalParticipants = pool.totalParticipants;
         totalLiquidity = pool.totalLiquidity;
         
-        // Get current price
         uint256 reserve0 = IERC20(pool.baseToken).balanceOf(address(this));
         uint256 reserve1 = IERC20(pool.quoteToken).balanceOf(address(this));
         
@@ -1521,9 +1136,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Get user's pool participation status
-     */
     function isPoolParticipant(address baseToken, address quoteToken, address user) external view returns (bool) {
         bytes32 pairHash = keccak256(abi.encodePacked(baseToken, quoteToken));
         Pool storage pool = pools[pairHash];
@@ -1535,9 +1147,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
 
 
 
-    /**
-     * @dev Calculate APR for a pool based on recent fees and volume
-     */
     function getPoolAPR(
         address baseToken,
         address quoteToken,
@@ -1567,13 +1176,9 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             return 0;
         }
         
-        // Calculate APR: (fees / totalLiquidity) * (365 days / period) * 10000
         apr = (fees * 365 days * 10000) / (pool.totalLiquidity * period);
     }
 
-    /**
-     * @dev Get cross-chain liquidity distribution for a user
-     */
     function getCrossChainLiquidityDistribution(
         address user,
         address baseToken,
@@ -1583,9 +1188,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         uint256[] memory amounts,
         uint256 totalAmount
     ) {
-        // Get all supported chains
         uint256 supportedChainCount = 0;
-        for (uint16 i = 1; i <= 1000; i++) { // Reasonable chain ID range
+        for (uint16 i = 1; i <= 1000; i++) {
             if (supportedChainIds[i]) {
                 supportedChainCount++;
             }
@@ -1598,9 +1202,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         for (uint16 i = 1; i <= 1000; i++) {
             if (supportedChainIds[i]) {
                 chainIds[index] = i;
-                // This would require cross-chain queries in a real implementation
-                // For now, return 0 as this requires additional cross-chain infrastructure
-                // In production, this would query liquidity on each supported chain
                 amounts[index] = 0;
                 totalAmount += amounts[index];
                 index++;
@@ -1608,9 +1209,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Get supported chains for cross-chain operations
-     */
     function getSupportedChains() external view returns (
         uint16[] memory chainIds,
         address[] memory chainDexAddresses
@@ -1635,9 +1233,6 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Get pool risk assessment for frontend
-     */
     function getPoolRiskAssessment(
         address baseToken,
         address quoteToken
@@ -1652,26 +1247,21 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__PoolNotFound();
         }
         
-        // Determine risk level based on pool characteristics
         if (pool.isStablePair) {
             riskLevel = "Low";
-            volatilityRisk = 500; // 5% in basis points
-            liquidityRisk = 200;  // 2% in basis points
+            volatilityRisk = 500;
+            liquidityRisk = 200;
         } else {
             riskLevel = "High";
-            volatilityRisk = 2000; // 20% in basis points
-            liquidityRisk = 1000;  // 10% in basis points
+            volatilityRisk = 2000;
+            liquidityRisk = 1000;
         }
         
-        // Adjust based on liquidity depth
-        if (pool.totalLiquidity < 1000e18) { // Less than 1000 tokens
-            liquidityRisk = 1500; // 15% in basis points
+        if (pool.totalLiquidity < 1000e18) {
+            liquidityRisk = 1500;
         }
     }
 
-    /**
-     * @dev Get comprehensive user position data for a specific pool
-     */
     function getUserPosition(
         address baseToken,
         address quoteToken,
@@ -1690,10 +1280,8 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             revert TorqueDEX__PoolNotFound();
         }
         
-        // Get user ranges
         ranges = _getUserRanges(user, baseToken, quoteToken);
         
-        // Calculate total liquidity and balances
         totalLiquidity = 0;
         token0Balance = 0;
         token1Balance = 0;
@@ -1704,14 +1292,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             token1Balance += ranges[i].amount1;
         }
         
-        // Get LP token balance
         lpTokens = TorqueLP(pool.lpToken).balanceOf(user);
         isParticipant = pool.participants[user];
     }
 
-    /**
-     * @dev Get user's total liquidity across all pools
-     */
     function getUserTotalLiquidity(address user) external view returns (
         uint256 totalLiquidity,
         uint256 totalLpTokens,
@@ -1730,14 +1314,10 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             poolLiquidity[i] = userLpBalance;
             totalLpTokens += userLpBalance;
             
-            // Estimate liquidity value (simplified)
             totalLiquidity += userLpBalance;
         }
     }
 
-    /**
-     * @dev Get pool price range information for concentrated liquidity
-     */
     function getPoolPriceRange(
         address baseToken,
         address quoteToken
@@ -1756,14 +1336,12 @@ contract TorqueDEX is OApp, ReentrancyGuard {
         isStablePair = pool.isStablePair;
         currentPrice = _getPrice(baseToken, quoteToken);
         
-        // For stable pairs, use a reasonable range around current price
         if (isStablePair) {
-            minPrice = (currentPrice * 95) / 100; // 5% below current price
-            maxPrice = (currentPrice * 105) / 100; // 5% above current price
+            minPrice = (currentPrice * 95) / 100;
+            maxPrice = (currentPrice * 105) / 100;
         } else {
-            // For volatile pairs, use a wider range
-            minPrice = (currentPrice * 80) / 100; // 20% below current price
-            maxPrice = (currentPrice * 120) / 100; // 20% above current price
+            minPrice = (currentPrice * 80) / 100;
+            maxPrice = (currentPrice * 120) / 100;
         }
     }
 }
