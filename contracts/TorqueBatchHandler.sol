@@ -70,8 +70,6 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         uint256 amount
     );
     
-
-    
     // Errors
     error TorqueBatchHandler__InvalidBatchSize();
     error TorqueBatchHandler__InvalidAmounts();
@@ -215,8 +213,6 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         emit BatchBurnInitiated(msg.sender, currency, totalBurn, dstChainIds, amountsPerChain);
     }
 
-
-    
     /**
      * @dev Handle incoming mint requests from other chains
      */
@@ -328,8 +324,6 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         );
     }
 
-
-    
     /**
      * @dev Get batch mint quote (gas estimation)
      */
@@ -607,4 +601,4 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
         chainIds[7] = AVALANCHE_CHAIN_ID;
         return chainIds;
     }
-} 
+}
