@@ -54,6 +54,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       NZD_USD: "0x3977CFc9e4f29C184D4675f4EB8e0013236e5f3e",
       XAU_USD: "0x214eD9Da11D2fbe465a6fc601a91E62EbEc1a0D6",
       XAG_USD: "0x379589227b15F1a12195D3f2d90bBc9F31f95235",
+      CNY_USD: "0xeF8A4aF35cd47424672E3C590aBD37FBB7A7759a",
+      KRW_USD: "0x01435677FB11763550905594A16B645847C1d0F3",
       USDC_USD: "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6"
     },
         8453: { // Base
@@ -66,6 +68,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
        NZD_USD: "0x06bdFe07E71C476157FC025d3cCD4BBe08e83EF9",
        XAU_USD: "0x5213eBB69743b85644dbB6E25cdF994aFBb8cF31",
        XAG_USD: "0x0000000000000000000000000000000000000000", // No XAG/USD feed available
+       CNY_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
+       KRW_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
        USDC_USD: "0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165"
      },
     42161: { // Arbitrum
@@ -78,9 +82,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       NZD_USD: "0x0000000000000000000000000000000000000000", // No NZD/USD feed available
       XAU_USD: "0x1F954Dc24a49708C26E0C1777f16750B5C6d5a2c",
       XAG_USD: "0xC56765f04B248394CF1619D20dB8082Edbfa75b1",
+      CNY_USD: "0xcC3370Bde6AFE51e1205a5038947b9836371eCCb",
+      KRW_USD: "0x85bb02E0Ae286600d1c68Bb6Ce22Cc998d411916",
       USDC_USD: "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3"
     },
-    137: { // Polygon
+        137: { // Polygon
       EUR_USD: "0x73366Fe0AA0Ded304479862808e02506FE556a98",
       GBP_USD: "0x099a2540848573e94fb1Ca0Fa420b00acbBc845a",
       JPY_USD: "0xD647a6fC9BC6402301583C91decC5989d8Bc382D",
@@ -90,6 +96,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       NZD_USD: "0xa302a0B8a499fD0f00449df0a490DedE21105955",
       XAU_USD: "0x0C466540B2ee1a31b441671eac0ca886e051E410",
       XAG_USD: "0x461c7B8D370a240DdB46B402748381C3210136b3",
+      CNY_USD: "0x04bB437Aa63E098236FA47365f0268547f6EAB32",
+      KRW_USD: "0x24B820870F726dA9B0D83B0B28a93885061dbF50",
       USDC_USD: "0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7"
     },
         10: { // Optimism
@@ -102,6 +110,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
        NZD_USD: "0x0000000000000000000000000000000000000000", // No NZD/USD feed available
        XAU_USD: "0x8F7bFb42Bf7421c2b34AAD619be4654bFa7B3B8B",
        XAG_USD: "0x290dd71254874f0d4356443607cb8234958DEe49",
+       CNY_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
+       KRW_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
        USDC_USD: "0x16a9FA2FDa030272Ce99B29CF780dFA30361E0f3"
      },
      43114: { // Avalanche
@@ -114,6 +124,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
        NZD_USD: "0x0000000000000000000000000000000000000000", // No NZD/USD feed available
        XAU_USD: "0x1F41EF93dece881Ad0b98082B2d44D3f6F0C515B",
        XAG_USD: "0xA771e0D1e9E1eCc07C56CC38240779E54337d682",
+       CNY_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
+       KRW_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
        USDC_USD: "0x97FE42a7E96640D932bbc0e1580c73E705A8EB73"
      },
      56: { // BSC
@@ -126,7 +138,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       NZD_USD: "0x0000000000000000000000000000000000000000", // No NZD/USD feed available
       XAU_USD: "0x86896fEB19D8A607c3b11f2aF50A0f239Bd71CD0",
       XAG_USD: "0x817326922c909b16944817c207562B25C4dF16aD",
-      USDC_USD: "0x90c069C4538adAc136E051052E14c1cD799C41B7"
+       CNY_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
+       KRW_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
+       USDC_USD: "0x90c069C4538adAc136E051052E14c1cD799C41B7"
      },
      146: { // Sonic
        EUR_USD: "0x0fceF1123FDBEdC89a0189B15D35B7A33B7694c0",
@@ -191,7 +205,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
        CHF_USD: "0x0000000000000000000000000000000000000000", // No CHF/USD feed available
        NZD_USD: "0x0000000000000000000000000000000000000000", // No NZD/USD feed available
        XAU_USD: "0xa6932B792e4b4FfA1e78e63671f42d0aff02eD73",
-       XAG_USD: "0x231eEe8c370512c48713c79966a969AC7c3E3bAd",
+       XAG_USD: "0x0000000000000000000000000000000000000000",
+       CNY_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
+       KRW_USD: "0x0000000000000000000000000000000000000000", // Placeholder - you'll provide the actual feed
        USDC_USD: "0x0000000000000000000000000000000000000000" // placeholder
      },
      97: { // BSC Testnet
@@ -270,6 +286,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     { name: 'Torque NZD', symbol: 'TNZD', contract: 'TorqueNZD' },
     { name: 'Torque XAU', symbol: 'TXAU', contract: 'TorqueXAU' },
     { name: 'Torque XAG', symbol: 'TXAG', contract: 'TorqueXAG' },
+    { name: 'Torque CNY', symbol: 'TCNY', contract: 'TorqueCNY' },
+    { name: 'Torque KRW', symbol: 'TKRW', contract: 'TorqueKRW' },
   ];
 
   const deployedCurrencies = [];
@@ -361,6 +379,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       collateralToken: DEFAULT_COLLATERAL_TOKEN,
       priceFeed: currentChainPriceFeeds.XAG_USD || "0x0000000000000000000000000000000000000000",
       currencySymbol: 'TXAG'
+    },
+    { 
+      name: 'Torque CNY Engine', 
+      contract: 'TorqueCNYEngine',
+      collateralToken: DEFAULT_COLLATERAL_TOKEN,
+      priceFeed: currentChainPriceFeeds.CNY_USD || "0x0000000000000000000000000000000000000000",
+      currencySymbol: 'TCNY'
+    },
+    { 
+      name: 'Torque KRW Engine', 
+      contract: 'TorqueKRWEngine',
+      collateralToken: DEFAULT_COLLATERAL_TOKEN,
+      priceFeed: currentChainPriceFeeds.KRW_USD || "0x0000000000000000000000000000000000000000",
+      currencySymbol: 'TKRW'
     },
   ];
 
