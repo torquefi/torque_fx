@@ -325,25 +325,29 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
     }
 
     /**
-     * @dev Get batch mint quote (gas estimation)
+     * @dev Get quote for batch mint operation
+     * @param currency Currency address
+     * @param totalMintAmount Total amount to mint
+     * @param dstChainIds Array of destination chain IDs
+     * @param amountsPerChain Array of amounts per chain
+     * @return totalGasEstimate Estimated gas cost
      */
     function getBatchMintQuote(
+        address currency,
+        uint256 totalMintAmount,
         uint16[] calldata dstChainIds,
-        bytes[] calldata adapterParams
+        uint256[] calldata amountsPerChain
     ) external view returns (uint256 totalGasEstimate) {
+        require(dstChainIds.length == amountsPerChain.length, "Length mismatch");
+        require(dstChainIds.length > 0, "Empty arrays");
+        
         totalGasEstimate = 0;
-        
         for (uint256 i = 0; i < dstChainIds.length; i++) {
-            // Estimate gas for each cross-chain message
-            uint256 messageGas = _estimateGasForMessage(
-                dstChainIds[i],
-                adapterParams[i]
-            );
-            totalGasEstimate += messageGas;
+            require(supportedChainIds[dstChainIds[i]], "Unsupported chain");
+            require(amountsPerChain[i] > 0, "Invalid amount");
+            totalGasEstimate += 50000; // Mock gas estimate
         }
-        
-        // Add base transaction gas
-        totalGasEstimate += 21000; // Base transaction cost
+        return totalGasEstimate;
     }
     
     /**
@@ -402,8 +406,48 @@ contract TorqueBatchHandler is OApp, ReentrancyGuard {
      * @dev Set maximum batch size
      */
     function setMaxBatchSize(uint256 newMaxBatchSize) external onlyOwner {
-        require(newMaxBatchSize > 0 && newMaxBatchSize <= 100, "Invalid batch size");
+        if (newMaxBatchSize == 0 || newMaxBatchSize > 100) {
+            revert("Invalid batch size");
+        }
         maxBatchSize = newMaxBatchSize;
+    }
+
+    /**
+     * @dev Handle incoming cross-chain messages (non-blocking version)
+     */
+    function _nonblockingLzReceive(
+        uint16 _srcChainId,
+        bytes calldata _srcAddress,
+        uint64 _nonce,
+        bytes calldata _payload
+    ) internal {
+        // Decode the message
+        (address currency, address user, uint256 amount) = abi.decode(
+            _payload,
+            (address, address, uint256)
+        );
+        
+        // Validate engine exists for this currency and chain
+        address engineAddress = engineAddresses[currency][_srcChainId];
+        if (engineAddress == address(0)) {
+            emit BatchMintFailed(
+                user,
+                currency,
+                _srcChainId,
+                amount,
+                "Engine not configured"
+            );
+            return;
+        }
+
+        // Call the engine to mint tokens
+        try TorqueEngine(engineAddress).mintTorque(amount, user) {
+            emit BatchMintCompleted(user, currency, _srcChainId, amount);
+        } catch Error(string memory reason) {
+            emit BatchMintFailed(user, currency, _srcChainId, amount, reason);
+        } catch {
+            emit BatchMintFailed(user, currency, _srcChainId, amount, "Unknown error");
+        }
     }
 
     /**

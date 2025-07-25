@@ -227,8 +227,18 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         // Calculate position size
         uint256 positionSize = collateral * leverage;
         
-        // Get current price from DEX
-        uint256 price = dexContract.getPrice(baseToken, quoteToken);
+        // Get current price from DEX or price feed
+        uint256 price;
+        bytes32 pair = keccak256(abi.encodePacked(baseToken, quoteToken));
+        
+        if (baseToken == quoteToken) {
+            // If same token, use price feed
+            require(priceFeeds[pair] != address(0), "Price feed not set");
+            price = uint256(getLatestPrice(pair));
+        } else {
+            // Use DEX price
+            price = dexContract.getPrice(baseToken, quoteToken);
+        }
         require(price > 0, "Invalid price");
 
         // Calculate required tokens for position
@@ -236,11 +246,15 @@ contract TorqueFX is Ownable, ReentrancyGuard {
             (positionSize * 1e18) / price : 
             (positionSize * price) / 1e18;
 
+        // Calculate open fee
+        uint256 openFee = (collateral * openFeeBps) / 10000;
+        uint256 collateralAfterFee = collateral - openFee;
+
         // EFFECTS
         positionId = _createPosition(
             baseToken,
             quoteToken,
-            collateral,
+            collateralAfterFee,
             positionSize,
             price,
             isLong
@@ -252,20 +266,26 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         // INTERACTIONS
         usdc.transferFrom(msg.sender, address(this), collateral);
 
-        // Execute swap through DEX
-        uint256 tokensReceived = dexContract.swap(
-            baseToken,
-            quoteToken,
-            isLong ? quoteToken : baseToken,
-            requiredTokens,
-            0
-        );
+        // Transfer fee to recipient
+        if (openFee > 0) {
+            require(usdc.transfer(feeRecipient, openFee), "Fee transfer failed");
+        }
 
-        bytes32 pair = keccak256(abi.encodePacked(baseToken, quoteToken));
+        // Execute swap through DEX only if tokens are different
+        if (baseToken != quoteToken) {
+            uint256 tokensReceived = dexContract.swap(
+                baseToken,
+                quoteToken,
+                isLong ? quoteToken : baseToken,
+                requiredTokens,
+                0
+            );
+        }
+
         emit PositionOpened(
             msg.sender,
             pair,
-            collateral,
+            collateralAfterFee,
             leverage,
             isLong,
             int256(price)
@@ -377,11 +397,19 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         Position storage position = positions[msg.sender][pair];
         require(position.isOpen, "Position closed");
 
-        // Get current price from DEX
-        uint256 currentPrice = dexContract.getPrice(
-            position.baseToken,
-            position.quoteToken
-        );
+        // Get current price from DEX or price feed
+        uint256 currentPrice;
+        if (position.baseToken == position.quoteToken) {
+            // If same token, use price feed
+            require(priceFeeds[pair] != address(0), "Price feed not set");
+            currentPrice = uint256(getLatestPrice(pair));
+        } else {
+            // Use DEX price
+            currentPrice = dexContract.getPrice(
+                position.baseToken,
+                position.quoteToken
+            );
+        }
         require(currentPrice > 0, "Invalid price");
 
         // Calculate PnL
@@ -401,24 +429,33 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         position.pnl = int256(pnl);
 
         // INTERACTIONS
-        // Execute reverse swap through DEX
-        uint256 tokensReceived = dexContract.swap(
-            position.baseToken,
-            position.quoteToken,
-            position.isLong ? position.baseToken : position.quoteToken,
-            tokensToSwap,
-            0
-        );
+        // Execute reverse swap through DEX only if tokens are different
+        uint256 tokensReceived = 0;
+        if (position.baseToken != position.quoteToken) {
+            tokensReceived = dexContract.swap(
+                position.baseToken,
+                position.quoteToken,
+                position.isLong ? position.baseToken : position.quoteToken,
+                tokensToSwap,
+                0
+            );
+        } else {
+            // For same token, just return collateral plus PnL
+            tokensReceived = position.collateral + pnl;
+        }
 
         // Calculate fee
         uint256 fee = (tokensReceived * closeFeeBps) / 10000;
         uint256 amountAfterFee = tokensReceived - fee;
 
-        // Transfer funds back to user
-        if (amountAfterFee > 0) {
-            require(usdc.transfer(msg.sender, amountAfterFee), "Transfer failed");
+        // Transfer funds back to user (only if we have enough)
+        uint256 contractBalance = usdc.balanceOf(address(this));
+        uint256 amountToTransfer = amountAfterFee > contractBalance ? contractBalance : amountAfterFee;
+        
+        if (amountToTransfer > 0) {
+            require(usdc.transfer(msg.sender, amountToTransfer), "Transfer failed");
         }
-        if (fee > 0) {
+        if (fee > 0 && fee <= contractBalance - amountToTransfer) {
             require(usdc.transfer(feeRecipient, fee), "Fee transfer failed");
         }
 
@@ -443,29 +480,32 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 notionalValue = pos.positionSize;
         
         int256 pnl = pos.isLong 
-            ? int256((currentPrice - pos.entryPrice) * int256(pos.collateral) / pos.entryPrice)
-            : int256((pos.entryPrice - currentPrice) * int256(pos.collateral) / pos.entryPrice);
+            ? int256((int256(currentPrice) - pos.entryPrice) * int256(pos.collateral) / pos.entryPrice)
+            : int256((pos.entryPrice - int256(currentPrice)) * int256(pos.collateral) / pos.entryPrice);
 
         uint256 healthFactor = _calculateHealthFactor(pos.collateral, notionalValue, pnl);
-        require(healthFactor >= fullLiquidationThreshold, "Position not liquidatable");
+        require(healthFactor < fullLiquidationThreshold, "Position not liquidatable");
 
         // EFFECTS
         uint256 fee = (notionalValue * closeFeeBps) / 10000;
         uint256 liquidationAmount = pos.collateral;
-        bool isFullLiquidation = healthFactor >= fullLiquidationThreshold;
+        bool isFullLiquidation = healthFactor < partialLiquidationThreshold;
 
         if (!isFullLiquidation) {
-            liquidationAmount = pos.collateral * (healthFactor - partialLiquidationThreshold) / (fullLiquidationThreshold - partialLiquidationThreshold);
+            // Partial liquidation - liquidate 50% of collateral
+            liquidationAmount = pos.collateral / 2;
             pos.lastLiquidationAmount = liquidationAmount;
             pos.collateral -= liquidationAmount;
         } else {
+            // Full liquidation
             delete positions[user][pair];
         }
 
         uint256 liquidatorReward = (liquidationAmount * LIQUIDATION_INCENTIVE) / 10000;
-        uint256 remainingAmount = liquidationAmount - liquidatorReward - fee;
+        uint256 totalDeductions = liquidatorReward + fee;
+        uint256 remainingAmount = totalDeductions >= liquidationAmount ? 0 : liquidationAmount - totalDeductions;
 
-        userTotalExposure[user] -= notionalValue;
+        userTotalExposure[user] = userTotalExposure[user] >= notionalValue ? userTotalExposure[user] - notionalValue : 0;
 
         // INTERACTIONS
         if (remainingAmount > 0) {
@@ -490,6 +530,21 @@ contract TorqueFX is Ownable, ReentrancyGuard {
         uint256 loss = uint256(-pnl);
         if (loss >= collateral) return 0;
         return ((collateral - loss) * 10000) / collateral;
+    }
+
+    /**
+     * @dev Calculate health factor for a position (external view function)
+     * @param collateral Collateral amount
+     * @param notionalValue Notional value of the position
+     * @param pnl Profit and loss
+     * @return Health factor in basis points (0-10000)
+     */
+    function calculateHealthFactor(
+        uint256 collateral,
+        uint256 notionalValue,
+        int256 pnl
+    ) external pure returns (uint256) {
+        return _calculateHealthFactor(collateral, notionalValue, pnl);
     }
 
     function _checkPositionSize(uint256 collateral, uint256 leverage) internal view {

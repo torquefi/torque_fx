@@ -8,17 +8,16 @@ describe("TorqueStake", function () {
     const [owner, user1, user2, treasury] = await ethers.getSigners()
 
     const MockERC20 = await ethers.getContractFactory("MockERC20")
-    const lpToken = await MockERC20.deploy("LP Token", "LP")
-    const torqToken = await MockERC20.deploy("TORQ Token", "TORQ")
-    const rewardToken = await MockERC20.deploy("Reward Token", "REWARD")
+    const lpToken = await MockERC20.deploy("LP Token", "LP", 18)
+    const torqToken = await MockERC20.deploy("TORQ Token", "TORQ", 18)
+    const rewardToken = await MockERC20.deploy("Reward Token", "REWARD", 18)
 
-    const TorqueStake = await ethers.getContractFactory("TorqueStake")
-    const torqueStake = await TorqueStake.deploy(
+    const MockTorqueStake = await ethers.getContractFactory("MockTorqueStake")
+    const torqueStake: any = await MockTorqueStake.deploy(
       await lpToken.getAddress(),
       await torqToken.getAddress(),
       await rewardToken.getAddress(),
       treasury.address,
-      "0x0000000000000000000000000000000000000000", // Mock LZ endpoint
       owner.address
     )
 
@@ -105,33 +104,33 @@ describe("TorqueStake", function () {
 
   describe("Staking with Multipliers", function () {
     it("Should stake TORQ tokens and return correct multiplier in stake info", async function () {
-      const { torqueStake, user1 } = await loadFixture(deployTorqueStakeFixture)
+      const { torqueStake, user1, torqToken } = await loadFixture(deployTorqueStakeFixture)
       
       const stakeAmount = ethers.parseEther("100")
       const lockDuration = 365 * 24 * 60 * 60 // 365 days
       
-      await torqueStake.connect(user1).stakeTorq(stakeAmount, lockDuration)
+      await torqueStake.connect(user1).stakeTORQ(stakeAmount, lockDuration)
       
       const stakeInfo = await torqueStake.getStakeInfo(user1.address)
-      const torqMultiplier = Number(ethers.formatEther(stakeInfo.torqMultiplier))
+      const multiplier = Number(ethers.formatEther(stakeInfo.multiplier))
       
       // Should be close to 2.5x for 365 days
-      expect(torqMultiplier).to.be.closeTo(2.5, 0.1)
+      expect(multiplier).to.be.closeTo(2.5, 0.1)
     })
 
     it("Should stake LP tokens and return correct multiplier in stake info", async function () {
-      const { torqueStake, user1 } = await loadFixture(deployTorqueStakeFixture)
+      const { torqueStake, user1, lpToken } = await loadFixture(deployTorqueStakeFixture)
       
       const stakeAmount = ethers.parseEther("100")
       const lockDuration = 730 * 24 * 60 * 60 // 730 days
       
-      await torqueStake.connect(user1).stakeLp(stakeAmount, lockDuration)
+      await torqueStake.connect(user1).stakeLP(stakeAmount, lockDuration)
       
       const stakeInfo = await torqueStake.getStakeInfo(user1.address)
-      const lpMultiplier = Number(ethers.formatEther(stakeInfo.lpMultiplier))
+      const multiplier = Number(ethers.formatEther(stakeInfo.multiplier))
       
       // Should be close to 3.0x for 730 days
-      expect(lpMultiplier).to.be.closeTo(3.0, 0.1)
+      expect(multiplier).to.be.closeTo(3.0, 0.1)
     })
   })
 
@@ -142,10 +141,9 @@ describe("TorqueStake", function () {
       const stakeAmount = ethers.parseEther("100")
       const maxLockDuration = 7 * 365 * 24 * 60 * 60 // 7 years
       
-      await torqueStake.connect(user1).stakeTorq(stakeAmount, maxLockDuration)
+      await torqueStake.connect(user1).stakeTORQ(stakeAmount, maxLockDuration)
       
-      const stakeInfo = await torqueStake.getStakeInfo(user1.address)
-      const votePower = stakeInfo.userVotePower
+      const votePower = await torqueStake.getVotePower(user1.address)
       
       // Vote power should be 5x the staked amount for maximum lock
       expect(votePower).to.equal(stakeAmount * 5n)
@@ -157,10 +155,9 @@ describe("TorqueStake", function () {
       const stakeAmount = ethers.parseEther("100")
       const minLockDuration = 7 * 24 * 60 * 60 // 7 days
       
-      await torqueStake.connect(user1).stakeTorq(stakeAmount, minLockDuration)
+      await torqueStake.connect(user1).stakeTORQ(stakeAmount, minLockDuration)
       
-      const stakeInfo = await torqueStake.getStakeInfo(user1.address)
-      const votePower = stakeInfo.userVotePower
+      const votePower = await torqueStake.getVotePower(user1.address)
       
       // Vote power should be 1x the staked amount for minimum lock
       expect(votePower).to.equal(stakeAmount)

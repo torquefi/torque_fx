@@ -1707,4 +1707,85 @@ contract TorqueDEX is OApp, ReentrancyGuard {
             emit ParticipantAdded(pool.baseToken, pool.quoteToken, participant);
         }
     }
+
+    /**
+     * @dev Get cross-chain liquidity for a user on a specific chain
+     * @param user Address of the user
+     * @param chainId Chain ID to check
+     * @return Amount of cross-chain liquidity
+     */
+    function getCrossChainLiquidity(address user, uint16 chainId) external view returns (uint256) {
+        // This would track cross-chain liquidity per user per chain
+        // For now, return 0 as this requires additional tracking infrastructure
+        return 0;
+    }
+
+    /**
+     * @dev Get total cross-chain liquidity for a user across all chains
+     * @param user Address of the user
+     * @return Total amount of cross-chain liquidity
+     */
+    function getTotalCrossChainLiquidity(address user) external view returns (uint256) {
+        // This would sum up cross-chain liquidity across all chains
+        // For now, return 0 as this requires additional tracking infrastructure
+        return 0;
+    }
+
+    /**
+     * @dev Get cross-chain liquidity quote for gas estimation
+     * @param dstChainIds Array of destination chain IDs
+     * @param adapterParams Array of adapter parameters
+     * @return totalGasEstimate Total gas estimate for cross-chain operations
+     */
+    function getCrossChainLiquidityQuote(
+        uint16[] calldata dstChainIds,
+        bytes[] calldata adapterParams
+    ) external view returns (uint256 totalGasEstimate) {
+        require(dstChainIds.length == adapterParams.length, "Array length mismatch");
+        
+        totalGasEstimate = 0;
+        for (uint256 i = 0; i < dstChainIds.length; i++) {
+            if (!supportedChainIds[dstChainIds[i]]) {
+                revert TorqueDEX__UnsupportedChain();
+            }
+            // Base gas cost for cross-chain message
+            totalGasEstimate += 50000;
+        }
+        return totalGasEstimate;
+    }
+
+    /**
+     * @dev Emergency function to withdraw stuck tokens
+     * @param token Address of the token to withdraw
+     * @param to Address to send tokens to
+     * @param amount Amount to withdraw
+     */
+    function emergencyWithdraw(address token, address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    /**
+     * @dev Set fee for a specific pool
+     * @param baseToken Address of the base token
+     * @param quoteToken Address of the quote token
+     * @param newFeeBps New fee in basis points
+     */
+    function setFee(address baseToken, address quoteToken, uint256 newFeeBps) external onlyOwner {
+        require(newFeeBps <= 1000, "Fee too high");
+        Pool storage pool = _getPool(baseToken, quoteToken);
+        pool.feeBps = newFeeBps;
+    }
+
+    /**
+     * @dev Set fee recipient for a specific pool
+     * @param baseToken Address of the base token
+     * @param quoteToken Address of the quote token
+     * @param newFeeRecipient New fee recipient address
+     */
+    function setFeeRecipient(address baseToken, address quoteToken, address newFeeRecipient) external onlyOwner {
+        require(newFeeRecipient != address(0), "Invalid fee recipient");
+        Pool storage pool = _getPool(baseToken, quoteToken);
+        pool.feeRecipient = newFeeRecipient;
+    }
 }
